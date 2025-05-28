@@ -3,6 +3,7 @@ from langchain_deepseek import ChatDeepSeek
 from typing import Optional
 
 from src.config import (
+    REASONING_PROVIDER,
     REASONING_MODEL,
     REASONING_BASE_URL,
     REASONING_API_KEY,
@@ -72,11 +73,18 @@ def get_llm_by_type(llm_type: LLMType) -> ChatOpenAI | ChatDeepSeek:
         return _llm_cache[llm_type]
 
     if llm_type == "reasoning":
-        llm = create_deepseek_llm(
-            model=REASONING_MODEL,
-            base_url=REASONING_BASE_URL,
-            api_key=REASONING_API_KEY,
-        )
+        if REASONING_PROVIDER == "deepseek":
+            llm = create_deepseek_llm(
+                model=REASONING_MODEL,
+                base_url=REASONING_BASE_URL,
+                api_key=REASONING_API_KEY,
+            )
+        else:
+            llm = create_openai_llm(
+                model=REASONING_MODEL,
+                base_url=REASONING_BASE_URL,
+                api_key=REASONING_API_KEY,
+            )
     elif llm_type == "basic":
         llm = create_openai_llm(
             model=BASIC_MODEL,

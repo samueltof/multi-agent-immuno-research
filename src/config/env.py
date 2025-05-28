@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Reasoning LLM configuration (for complex reasoning tasks)
-REASONING_MODEL = os.getenv("REASONING_MODEL", "o1-mini")
+REASONING_PROVIDER = os.getenv("REASONING_PROVIDER", "openai")  # "openai" or "deepseek"
+REASONING_MODEL = os.getenv("REASONING_MODEL", "o3-mini")
 REASONING_BASE_URL = os.getenv("REASONING_BASE_URL")
 REASONING_API_KEY = os.getenv("REASONING_API_KEY")
 

@@ -1,5 +1,6 @@
 from .env import (
     # Reasoning LLM
+    REASONING_PROVIDER,
     REASONING_MODEL,
     REASONING_BASE_URL,
     REASONING_API_KEY,
@@ -21,6 +22,7 @@ TEAM_MEMBERS = ["researcher", "coder", "browser", "reporter"]
 
 __all__ = [
     # Reasoning LLM
+    "REASONING_PROVIDER",
     "REASONING_MODEL",
     "REASONING_BASE_URL",
     "REASONING_API_KEY",

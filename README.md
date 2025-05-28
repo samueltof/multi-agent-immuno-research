@@ -140,6 +140,7 @@ LangManus uses a three-tier LLM system with separate configurations for reasonin
 
 ```ini
 # Reasoning LLM Configuration (for complex reasoning tasks)
+REASONING_PROVIDER=openai  # Choose "openai" or "deepseek"
 REASONING_MODEL=your_reasoning_model
 REASONING_API_KEY=your_reasoning_api_key
 REASONING_BASE_URL=your_custom_base_url  # Optional
@@ -165,9 +166,12 @@ CHROME_INSTANCE_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrom
 > **Note:**
 >
 > - The system uses different models for different types of tasks:
->     - Reasoning LLM for complex decision-making and analysis
+>     - Reasoning LLM for complex decision-making and analysis (supports both OpenAI and DeepSeek providers)
 >     - Basic LLM for simpler text-based tasks
 >     - Vision-Language LLM for tasks involving image understanding
+> - For reasoning tasks, you can choose between:
+>     - `REASONING_PROVIDER=openai` for OpenAI models (e.g., o3-mini, o1-preview)
+>     - `REASONING_PROVIDER=deepseek` for DeepSeek models (e.g., deepseek-reasoner)
 > - You can customize the base URLs for all LLMs independently
 > - Each LLM can use different API keys if needed
 > - Jina API key is optional. Provide your own key to access a higher rate limit (get your API key at [jina.ai](https://jina.ai/))
