@@ -52,7 +52,7 @@ async def run_agent_workflow(
 
     workflow_id = str(uuid.uuid4())
 
-    streaming_llm_agents = [*TEAM_MEMBERS, "planner", "coordinator"]
+    streaming_llm_agents = [*TEAM_MEMBERS, "planner", "coordinator", "supervisor"]
 
     # Reset coordinator cache at the start of each workflow
     global coordinator_cache
@@ -88,6 +88,10 @@ async def run_agent_workflow(
         )
         run_id = "" if (event.get("run_id") is None) else str(event["run_id"])
 
+        # Debug logging to understand what events are being processed
+        if debug:
+            logger.debug(f"Processing event: kind={kind}, name={name}, node={node}")
+
         if kind == "on_chain_start" and name in streaming_llm_agents:
             if name == "planner":
                 yield {
@@ -101,6 +105,7 @@ async def run_agent_workflow(
                     "agent_id": f"{workflow_id}_{name}_{langgraph_step}",
                 },
             }
+            yield ydata
         elif kind == "on_chain_end" and name in streaming_llm_agents:
             ydata = {
                 "event": "end_of_agent",
@@ -109,16 +114,19 @@ async def run_agent_workflow(
                     "agent_id": f"{workflow_id}_{name}_{langgraph_step}",
                 },
             }
+            yield ydata
         elif kind == "on_chat_model_start" and node in streaming_llm_agents:
             ydata = {
                 "event": "start_of_llm",
                 "data": {"agent_name": node},
             }
+            yield ydata
         elif kind == "on_chat_model_end" and node in streaming_llm_agents:
             ydata = {
                 "event": "end_of_llm",
                 "data": {"agent_name": node},
             }
+            yield ydata
         elif kind == "on_chat_model_stream" and node in streaming_llm_agents:
             content = data["chunk"].content
             if content is None or content == "":
@@ -136,6 +144,7 @@ async def run_agent_workflow(
                         },
                     },
                 }
+                yield ydata
             else:
                 # Check if the message is from the coordinator
                 if node == "coordinator":
@@ -155,6 +164,7 @@ async def run_agent_workflow(
                                 "delta": {"content": cached_content},
                             },
                         }
+                        yield ydata
                     elif not is_handoff_case:
                         # For other agents, send the message directly
                         ydata = {
@@ -164,6 +174,7 @@ async def run_agent_workflow(
                                 "delta": {"content": content},
                             },
                         }
+                        yield ydata
                 else:
                     # For other agents, send the message directly
                     ydata = {
@@ -173,6 +184,7 @@ async def run_agent_workflow(
                             "delta": {"content": content},
                         },
                     }
+                    yield ydata
         elif kind == "on_tool_start" and node in TEAM_MEMBERS:
             ydata = {
                 "event": "tool_call",
@@ -182,6 +194,7 @@ async def run_agent_workflow(
                     "tool_input": data.get("input"),
                 },
             }
+            yield ydata
         elif kind == "on_tool_end" and node in TEAM_MEMBERS:
             ydata = {
                 "event": "tool_call_result",
@@ -191,18 +204,21 @@ async def run_agent_workflow(
                     "tool_result": data["output"].content if data.get("output") else "",
                 },
             }
+            yield ydata
         else:
             continue
-        yield ydata
 
-    if is_handoff_case:
-        yield {
-            "event": "end_of_workflow",
-            "data": {
-                "workflow_id": workflow_id,
-                "messages": [
-                    convert_message_to_dict(msg)
-                    for msg in data["output"].get("messages", [])
-                ],
-            },
-        }
+    # Send final workflow completion event
+    logger.info("Workflow completed, sending final event")
+    final_event_data = {"workflow_id": workflow_id}
+    
+    if is_handoff_case and 'data' in locals() and data.get("output"):
+        final_event_data["messages"] = [
+            convert_message_to_dict(msg)
+            for msg in data["output"].get("messages", [])
+        ]
+    
+    yield {
+        "event": "end_of_workflow",
+        "data": final_event_data,
+    }
