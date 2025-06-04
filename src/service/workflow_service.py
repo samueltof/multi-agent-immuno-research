@@ -60,7 +60,6 @@ async def run_agent_workflow(
     global is_handoff_case
     is_handoff_case = False
 
-    # TODO: extract message content from object, specifically for on_chat_model_stream
     async for event in graph.astream_events(
         {
             # Constants
