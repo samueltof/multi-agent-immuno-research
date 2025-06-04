@@ -1,0 +1,26 @@
+[server]
+port = 8501
+address = "0.0.0.0"
+headless = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#667eea"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8f9fa"
+textColor = "#262730"
+
+[logger]
+level = "info"
+
+[runner]
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+
+[client]
+showErrorDetails = true
+toolbarMode = "auto" 

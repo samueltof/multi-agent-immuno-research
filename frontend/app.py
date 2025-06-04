@@ -5,6 +5,20 @@ import time
 from typing import Dict, List, Any, Optional
 import sseclient
 from urllib.parse import urljoin
+import asyncio
+import sys
+import os
+
+# Add the parent directory to the path to import from src
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import for direct workflow execution
+try:
+    from src.service.workflow_service import run_agent_workflow as run_workflow_direct
+    DIRECT_MODE_AVAILABLE = True
+except ImportError:
+    DIRECT_MODE_AVAILABLE = False
+    print("Warning: Direct workflow execution not available. Only API mode will work.")
 
 # Page configuration
 st.set_page_config(
@@ -383,37 +397,23 @@ def extract_thought_process(content: str) -> str:
     return ""
 
 def format_agent_content(content: str) -> str:
-    """Format agent content to make it more readable"""
+    """Format agent content to make it more readable - simplified version"""
     try:
         # Try to parse as JSON first
         if content.strip().startswith('{') and content.strip().endswith('}'):
             import json
             data = json.loads(content)
             
-            # Handle thought processes
+            # Handle thought processes - extract just the essential text
             if "thought" in data and "title" in data:
-                formatted = f"""
-                <div style="background: #f8fafc; padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border-left: 4px solid #3b82f6;">
-                    <h4 style="color: #1e3a8a; margin-bottom: 1rem;">💭 Agent Analysis</h4>
-                    <div style="background: #ffffff; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                        <strong>Thought Process:</strong><br>
-                        <em style="color: #64748b;">{data['thought']}</em>
-                    </div>
-                    <div style="background: #ffffff; padding: 1rem; border-radius: 8px;">
-                        <strong>Plan Title:</strong> {data['title']}
-                    </div>
-                </div>
-                """
+                result = f"💭 **Agent Analysis**\n\n"
+                result += f"**Thought Process:** {data['thought']}\n\n"
+                result += f"**Plan Title:** {data['title']}\n\n"
                 
                 # Add steps if they exist
                 if "steps" in data and isinstance(data["steps"], list):
-                    formatted += """
-                    <div style="background: #f8fafc; padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
-                        <h4 style="color: #1e3a8a; margin-bottom: 1rem;">📋 Execution Plan</h4>
-                    """
-                    
+                    result += "**Execution Plan:**\n"
                     for i, step in enumerate(data["steps"], 1):
-                        # Better agent icon mapping
                         agent_icons = {
                             "researcher": "🔍",
                             "coder": "💻", 
@@ -425,89 +425,71 @@ def format_agent_content(content: str) -> str:
                         }
                         agent_icon = agent_icons.get(step.get("agent_name"), "🤖")
                         
-                        formatted += f"""
-                        <div style="background: #ffffff; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 3px solid #3b82f6;">
-                            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                                <span style="background: #1e3a8a; color: #ffffff; padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.8rem; margin-right: 0.5rem;">
-                                    Step {i}
-                                </span>
-                                <span style="margin-right: 0.5rem;">{agent_icon}</span>
-                                <strong>{step.get('title', 'Untitled')}</strong>
-                                <span style="margin-left: auto; color: #64748b; font-size: 0.8rem;">
-                                    {step.get('agent_name', 'unknown').title()}
-                                </span>
-                            </div>
-                            <p style="margin-bottom: 0.5rem; color: #1e293b;">{step.get('description', '')}</p>
-                            {f'<p style="font-size: 0.9rem; color: #64748b; font-style: italic;">💡 {step.get("note", "")}</p>' if step.get("note") else ''}
-                        </div>
-                        """
-                    formatted += "</div>"
+                        result += f"\n{i}. {agent_icon} **{step.get('title', 'Untitled')}** ({step.get('agent_name', 'unknown').title()})\n"
+                        result += f"   {step.get('description', '')}\n"
+                        if step.get("note"):
+                            result += f"   💡 {step.get('note')}\n"
                 
-                return formatted
+                return result
             
-            # Handle other JSON structures
+            # For other JSON structures, just show key information
             else:
-                return f"""
-                <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.9rem;">
-                    <pre>{json.dumps(data, indent=2)}</pre>
-                </div>
-                """
+                # Extract key fields if they exist
+                result = ""
+                if "content" in data:
+                    result += f"{data['content']}\n"
+                elif "message" in data:
+                    result += f"{data['message']}\n"
+                elif "text" in data:
+                    result += f"{data['text']}\n"
+                else:
+                    # If no recognizable structure, show the raw content but cleaner
+                    result = str(data)
+                
+                return result
         
-        # If not JSON, return as-is but with better formatting
+        # If not JSON, return as-is
         else:
-            # Handle markdown headers
-            content = content.replace('# ', '<h3 style="color: #1e3a8a; margin: 1.5rem 0 1rem 0;">')
-            content = content.replace('## ', '<h4 style="color: #1e3a8a; margin: 1rem 0 0.5rem 0;">')
-            content = content.replace('\n\n', '</p><p>')
-            
-            if not content.startswith('<'):
-                content = f'<p>{content}</p>'
-            if content.endswith('</p><p>'):
-                content = content[:-7]
-            
             return content
             
     except json.JSONDecodeError:
-        # If JSON parsing fails, return formatted text
-        content = content.replace('# ', '<h3 style="color: #1e3a8a; margin: 1.5rem 0 1rem 0;">')
-        content = content.replace('## ', '<h4 style="color: #1e3a8a; margin: 1rem 0 0.5rem 0;">')
-        content = content.replace('\n\n', '</p><p>')
-        
-        if not content.startswith('<'):
-            content = f'<p>{content}</p>'
-        if content.endswith('</p><p>'):
-            content = content[:-7]
-            
+        # If JSON parsing fails, return as plain text
         return content
     except Exception:
         return content
 
 def display_message(message: Dict[str, str], is_user: bool = False):
-    """Display a chat message with modern styling"""
+    """Display a chat message with simplified styling"""
     role = message.get("role", "assistant")
     content = message.get("content", "")
     
     if role == "user":
-        message_class = "user-message"
         icon = "👤"
-    elif role == "system":
-        message_class = "system-message"
-        icon = "⚙️"
-    else:
-        message_class = "assistant-message"
-        icon = "🤖"
-        # Format assistant content for better readability
-        content = format_agent_content(content)
-    
-    st.markdown(f"""
-    <div class="chat-message {message_class}">
-        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-            <span style="font-size: 1.2rem; margin-right: 0.5rem;">{icon}</span>
-            <strong>{role.title()}</strong>
+        # User messages in blue background
+        st.markdown(f"""
+        <div style="background: #1e3a8a; color: white; padding: 1rem; border-radius: 10px; margin: 1rem 3rem 1rem 0;">
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                <span style="margin-right: 0.5rem;">{icon}</span>
+                <strong>You</strong>
+            </div>
+            <div>{content}</div>
         </div>
-        <div>{content}</div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    else:
+        icon = "🤖"
+        # Format assistant content for better readability but keep it simple
+        formatted_content = format_agent_content(content)
+        
+        # Assistant messages in light background
+        st.markdown(f"""
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                <span style="margin-right: 0.5rem;">{icon}</span>
+                <strong>Assistant</strong>
+            </div>
+            <div style="white-space: pre-wrap; font-family: inherit;">{formatted_content}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 def get_server_status(api_url: str) -> bool:
     """Check if the API server is running"""
@@ -517,24 +499,115 @@ def get_server_status(api_url: str) -> bool:
     except:
         return False
 
+async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
+    """Run workflow directly without API server - with streaming simulation"""
+    if not DIRECT_MODE_AVAILABLE:
+        st.error("❌ Direct workflow execution is not available. Please start the API server.")
+        return
+    
+    try:
+        # Create containers for streaming output
+        response_container = st.empty()
+        current_response = ""
+        
+        # Show processing indicator
+        with st.status("Running workflow directly...", expanded=True) as status:
+            status.write("🤖 Starting direct workflow execution...")
+            
+            # Convert messages to the format expected by the direct workflow
+            user_input_messages = []
+            for msg in messages:
+                if msg["role"] == "user":
+                    user_input_messages.append({"role": "user", "content": msg["content"]})
+            
+            if not user_input_messages:
+                st.error("No user messages found")
+                return
+            
+            # Run the workflow directly with streaming events
+            agent_responses = []
+            final_message = ""
+            
+            async for event in run_workflow_direct(
+                user_input_messages=user_input_messages,
+                debug=config.get("debug", False),
+                deep_thinking_mode=config.get("deep_thinking_mode", False),
+                search_before_planning=config.get("search_before_planning", False)
+            ):
+                event_type = event.get("event")
+                event_data = event.get("data", {})
+                
+                if event_type == "start_of_workflow":
+                    status.write("🚀 Workflow started...")
+                
+                elif event_type == "start_of_agent":
+                    agent_name = event_data.get("agent_name", "unknown")
+                    status.write(f"🤖 Starting {agent_name.title()} agent...")
+                
+                elif event_type == "message":
+                    # Handle streaming message content
+                    if "delta" in event_data and "content" in event_data["delta"]:
+                        delta_content = event_data["delta"]["content"]
+                        current_response += delta_content
+                        
+                        # Update display with streaming content
+                        with response_container:
+                            if current_response.strip():
+                                st.markdown(f"""
+                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                        <span style="margin-right: 0.5rem;">🤖</span>
+                                        <strong>Assistant</strong>
+                                        <span style="margin-left: auto; color: #64748b; font-size: 0.8rem;">
+                                            <div class="streaming-dot"></div>Processing...
+                                        </span>
+                                    </div>
+                                    <div style="white-space: pre-wrap; font-family: inherit;">{format_agent_content(current_response.strip())}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                
+                elif event_type == "end_of_agent":
+                    agent_name = event_data.get("agent_name", "unknown")
+                    status.write(f"✅ {agent_name.title()} agent completed")
+                
+                elif event_type == "tool_call":
+                    tool_name = event_data.get("tool_name", "unknown")
+                    status.write(f"🔧 Using tool: {tool_name}")
+                
+                elif event_type == "end_of_workflow":
+                    status.write("🎉 Workflow completed!")
+                    final_message = current_response.strip()
+                    break
+            
+            # Update status when complete
+            status.update(label="Direct workflow completed!", state="complete")
+        
+        # Store final response in session history
+        if final_message:
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": final_message
+            })
+            
+            # Final display without streaming indicator
+            with response_container:
+                display_message({"role": "assistant", "content": final_message})
+            
+            st.success("✅ Response completed!")
+        else:
+            st.warning("⚠️ No response content received from direct workflow.")
+    
+    except Exception as e:
+        st.error(f"❌ Error running direct workflow: {str(e)}")
+        st.exception(e)  # For debugging
+
 def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> None:
-    """Stream chat response from the API"""
+    """Stream chat response from the API - simplified version"""
     payload = {
         "messages": messages,
         "debug": config.get("debug", False),
         "deep_thinking_mode": config.get("deep_thinking_mode", False),
         "search_before_planning": config.get("search_before_planning", False)
-    }
-    
-    # Agent descriptions for better context
-    agent_descriptions = {
-        "coordinator": "🎯 Analyzes the request and decides the best workflow approach",
-        "planner": "📋 Creates detailed step-by-step execution plans for complex tasks",
-        "supervisor": "👥 Manages team coordination and delegates tasks to specialized agents",
-        "researcher": "🔍 Searches for information using web searches and data collection",
-        "coder": "💻 Executes Python code, performs calculations, and technical analysis",
-        "browser": "🌐 Interacts with web pages and performs complex web operations",
-        "reporter": "📄 Compiles comprehensive reports from all gathered information"
     }
     
     try:
@@ -556,110 +629,72 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
             st.error(f"API Error: {response.status_code} - {response.text}")
             return
         
-        # Create containers for different types of content
+        # Create containers for streaming output
         response_container = st.empty()
         current_response = ""
         
-        # Create event log container
-        event_container = st.expander("📊 Event Log", expanded=False)
-        
-        # Track agent outputs separately
-        agent_outputs = {}
-        current_agent_output = ""
-        current_output_agent = None
-        
-        # Process SSE stream
-        client = sseclient.SSEClient(response)
-        
-        for event in client.events():
-            if event.event and event.data:
-                try:
-                    event_data = json.loads(event.data)
-                    
-                    # Log the event
-                    st.session_state.event_log.append({
-                        "timestamp": time.strftime("%H:%M:%S"),
-                        "event": event.event,
-                        "data": event_data
-                    })
-                    
-                    # Track agent state changes for output capture
-                    if event.event == "start_of_agent":
-                        agent_name = event_data.get("agent_name", "unknown")
-                        current_output_agent = agent_name
-                        current_agent_output = ""
-                    elif event.event == "end_of_agent":
-                        agent_name = event_data.get("agent_name", "unknown")
-                        # Store the agent's output
-                        if current_output_agent == agent_name and current_agent_output.strip():
-                            agent_outputs[agent_name] = current_agent_output.strip()
-                            current_agent_output = ""
-                            current_output_agent = None
-                    
-                    # Update event log display
-                    with event_container:
-                        event_log_text = ""
-                        for log_entry in st.session_state.event_log[-20:]:  # Show last 20 events
-                            event_log_text += f"[{log_entry['timestamp']}] {log_entry['event']}: {str(log_entry['data'])[:150]}...\n"
+        # Show simple processing indicator
+        with st.status("Processing your request...", expanded=True) as status:
+            # Process SSE stream
+            client = sseclient.SSEClient(response)
+            
+            for event in client.events():
+                if event.event and event.data:
+                    try:
+                        event_data = json.loads(event.data)
                         
-                        st.code(event_log_text, language="text")
-                    
-                    # Handle message content streaming with better filtering
-                    if event.event == "message":
-                        # Handle delta content from streaming
-                        if "delta" in event_data and "content" in event_data["delta"]:
-                            delta_content = event_data["delta"]["content"]
-                            
-                            # Filter out supervisor routing JSON
-                            if delta_content.strip().startswith('{"next":') or delta_content.strip() == '{"next":"FINISH"}':
-                                continue
-                                
-                            # Capture planner output (structured plans)
-                            if current_output_agent == "planner":
-                                current_agent_output += delta_content
-                                
-                                # Show simple "Planning..." message during planner work
-                                with response_container:
-                                    display_message({"role": "assistant", "content": "Planning your request..."})
-                            
-                            # Capture coordinator, reporter, and other final outputs
-                            elif current_output_agent in ["coordinator", "reporter"] or not current_output_agent:
+                        # Handle message content streaming - simplified
+                        if event.event == "message":
+                            if "delta" in event_data and "content" in event_data["delta"]:
+                                delta_content = event_data["delta"]["content"]
                                 current_response += delta_content
                                 
-                                # Update display immediately during streaming
+                                # Update display with clean content as it streams
                                 with response_container:
                                     if current_response.strip():
-                                        display_message({"role": "assistant", "content": current_response.strip()})
-                    
-                    elif event.event == "error":
-                        st.error(f"Workflow Error: {event_data}")
-                        break
+                                        # Show the streaming content in a clean format
+                                        st.markdown(f"""
+                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
+                                            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                                                <span style="margin-right: 0.5rem;">🤖</span>
+                                                <strong>Assistant</strong>
+                                                <span style="margin-left: auto; color: #64748b; font-size: 0.8rem;">
+                                                    <div class="streaming-dot"></div>Thinking...
+                                                </span>
+                                            </div>
+                                            <div style="white-space: pre-wrap; font-family: inherit;">{format_agent_content(current_response.strip())}</div>
+                                        </div>
+                                        """, unsafe_allow_html=True)
                         
-                except json.JSONDecodeError as e:
-                    st.warning(f"Failed to parse event data: {e}")
-                    continue
-                except Exception as e:
-                    st.warning(f"Error processing event: {e}")
-                    continue
+                        elif event.event == "error":
+                            st.error(f"Error: {event_data}")
+                            status.update(label="Error occurred", state="error")
+                            break
+                            
+                    except json.JSONDecodeError as e:
+                        st.warning(f"Failed to parse event data: {e}")
+                        continue
+                    except Exception as e:
+                        st.warning(f"Error processing event: {e}")
+                        continue
+            
+            # Update status when complete
+            status.update(label="Response completed!", state="complete")
         
-        # Handle final response for session history
-        final_response = current_response.strip() if current_response.strip() else "Response completed."
-        
-        # Handle planner output for sidebar
-        if current_agent_output.strip():
-            thought_process = extract_thought_process(current_agent_output.strip())
-            if thought_process:
-                st.session_state.current_thought_process = thought_process
-        
-        # Store in session history
-        if final_response and final_response != "Planning your request...":
+        # Store final response in session history
+        if current_response.strip():
             st.session_state.messages.append({
-                "role": "assistant", 
-                "content": final_response
+                "role": "assistant",
+                "content": current_response.strip()
             })
-        
-        # Show completion message
-        st.success("✅ Response completed!")
+            
+            # Final display without streaming indicator
+            with response_container:
+                display_message({"role": "assistant", "content": current_response.strip()})
+            
+            st.success("✅ Response completed!")
+        else:
+            st.warning("⚠️ No response content received.")
     
     except requests.exceptions.Timeout:
         st.error("Request timed out. Please try again.")
@@ -695,9 +730,41 @@ def main():
         st.markdown(f"""
         <div style="margin-top: 0.5rem;">
             <span class="status-indicator {status_class}"></span>
-            <span>{status_text}</span>
+            <span>API Server: {status_text}</span>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Direct mode status
+        direct_status_class = "status-connected" if DIRECT_MODE_AVAILABLE else "status-disconnected"
+        direct_status_text = "Available" if DIRECT_MODE_AVAILABLE else "Not Available"
+        
+        st.markdown(f"""
+        <div style="margin-top: 0.5rem;">
+            <span class="status-indicator {direct_status_class}"></span>
+            <span>Direct Mode: {direct_status_text}</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Execution mode info
+        if server_status:
+            mode_text = "🌐 API Mode (Server Available)"
+            mode_color = "var(--navy-blue)"
+        elif DIRECT_MODE_AVAILABLE:
+            mode_text = "🔧 Direct Mode (Fallback)"
+            mode_color = "var(--light-navy)"
+        else:
+            mode_text = "❌ No Execution Mode Available"
+            mode_color = "var(--text-gray)"
+        
+        st.markdown(f"""
+        <div style="margin-top: 1rem; padding: 0.75rem; background: var(--light-gray); border-radius: 8px; border-left: 3px solid {mode_color};">
+            <div style="font-weight: 500; color: {mode_color};">{mode_text}</div>
+            <div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 0.25rem;">
+                {'Using API server for execution' if server_status else ('Using direct workflow execution' if DIRECT_MODE_AVAILABLE else 'Please start API server or fix direct mode')}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Agent Configuration
@@ -723,6 +790,52 @@ def main():
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
+        # Execution Mode Selection
+        st.markdown('<div class="config-section">', unsafe_allow_html=True)
+        st.markdown("### Execution Mode")
+        
+        # Mode selection
+        execution_mode = st.radio(
+            "Choose execution mode:",
+            options=["Auto", "API Only", "Direct Only"],
+            index=0,
+            help="Select how you want to execute workflows"
+        )
+        
+        # Show mode status based on selection
+        if execution_mode == "Auto":
+            if server_status:
+                selected_mode_text = "🌐 Will use API Mode (preferred)"
+                selected_mode_color = "var(--navy-blue)"
+            elif DIRECT_MODE_AVAILABLE:
+                selected_mode_text = "🔧 Will use Direct Mode (fallback)"
+                selected_mode_color = "var(--light-navy)"
+            else:
+                selected_mode_text = "❌ No mode available"
+                selected_mode_color = "#ef4444"
+        elif execution_mode == "API Only":
+            if server_status:
+                selected_mode_text = "🌐 API Mode (available)"
+                selected_mode_color = "var(--navy-blue)"
+            else:
+                selected_mode_text = "⚠️ API Mode (not available)"
+                selected_mode_color = "#f59e0b"
+        else:  # Direct Only
+            if DIRECT_MODE_AVAILABLE:
+                selected_mode_text = "🔧 Direct Mode (available)"
+                selected_mode_color = "var(--light-navy)"
+            else:
+                selected_mode_text = "⚠️ Direct Mode (not available)"
+                selected_mode_color = "#f59e0b"
+        
+        st.markdown(f"""
+        <div style="margin-top: 0.5rem; padding: 0.75rem; background: var(--light-gray); border-radius: 8px; border-left: 3px solid {selected_mode_color};">
+            <div style="font-weight: 500; color: {selected_mode_color}; font-size: 0.9rem;">{selected_mode_text}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         # Conversation Management
         st.markdown('<div class="config-section">', unsafe_allow_html=True)
         st.markdown("### Conversation")
@@ -735,6 +848,35 @@ def main():
         
         st.markdown(f"Messages: {len(st.session_state.messages)}")
         st.markdown(f"Conversation ID: {st.session_state.conversation_id}")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Execution Modes Help
+        st.markdown('<div class="config-section">', unsafe_allow_html=True)
+        st.markdown("### Execution Modes")
+        
+        with st.expander("ℹ️ About Execution Modes"):
+            st.markdown("""
+            **🌐 API Server Mode:**
+            - Uses remote API server for workflow execution
+            - Requires API server to be running
+            - Best for production and shared environments
+            
+            **🔧 Direct Mode:**  
+            - Runs workflow directly in the application
+            - Useful for development and local testing
+            - Requires all dependencies to be installed
+            
+            **Mode Selection Options:**
+            - **Auto**: Automatically chooses the best available mode (API preferred)
+            - **API Only**: Forces API mode (fails if server unavailable)
+            - **Direct Only**: Forces direct mode (fails if dependencies missing)
+            
+            **Status Indicators:**
+            - 🟢 Available and ready to use
+            - ⚠️ Selected but not available
+            - ❌ Not available
+            """)
+        
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Main chat interface
@@ -775,34 +917,125 @@ def main():
         
         # Process user input
         if submit_button and user_input.strip():
-            if not server_status:
-                st.error("⚠️ API server is not available. Please check the server status.")
-                return
-            
             # Add user message to history
             user_message = {"role": "user", "content": user_input.strip()}
             st.session_state.messages.append(user_message)
             
-            # Configuration for API call
+            # Configuration for execution
             config = {
                 "debug": debug_mode,
                 "deep_thinking_mode": deep_thinking_mode,
                 "search_before_planning": search_before_planning
             }
             
-            # Stream response
-            with st.spinner("Processing..."):
-                stream_chat_response(
-                    st.session_state.api_url,
-                    st.session_state.messages,
-                    config
-                )
+            # Determine execution based on user selection
+            should_use_api = False
+            should_use_direct = False
+            error_message = None
+            
+            if execution_mode == "Auto":
+                # Automatic mode selection (original logic)
+                if server_status:
+                    should_use_api = True
+                elif DIRECT_MODE_AVAILABLE:
+                    should_use_direct = True
+                else:
+                    error_message = "❌ No execution mode available. Please start the API server or fix direct mode dependencies."
+            
+            elif execution_mode == "API Only":
+                # Force API mode
+                if server_status:
+                    should_use_api = True
+                else:
+                    error_message = "❌ API mode selected but server is not available. Please start the API server or switch to Auto/Direct mode."
+            
+            elif execution_mode == "Direct Only":
+                # Force direct mode
+                if DIRECT_MODE_AVAILABLE:
+                    should_use_direct = True
+                else:
+                    error_message = "❌ Direct mode selected but not available. Please install dependencies or switch to Auto/API mode."
+            
+            # Execute if we have a valid mode
+            if error_message:
+                st.error(error_message)
+                # Remove the user message since we couldn't process it
+                st.session_state.messages.pop()
+                return
+            
+            # Execute the workflow
+            if should_use_api:
+                st.info("🌐 Using API Server Mode")
+                with st.spinner("Processing via API..."):
+                    stream_chat_response(
+                        st.session_state.api_url,
+                        st.session_state.messages,
+                        config
+                    )
+            elif should_use_direct:
+                st.info("🔧 Using Direct Mode")
+                try:
+                    # Run the async direct workflow
+                    asyncio.run(run_direct_workflow(
+                        st.session_state.messages,
+                        config
+                    ))
+                except Exception as e:
+                    st.error(f"❌ Error in direct mode execution: {str(e)}")
+                    st.exception(e)
             
             # Rerun to show the new message
             st.rerun()
     
     with col2:
         st.markdown("## Status")
+        
+        # Execution Mode Status
+        st.markdown("### Current Mode")
+        server_status = get_server_status(st.session_state.api_url)
+        
+        # Get the execution mode from the sidebar (we need to access it here)
+        # Since we can't directly access the radio button value here, we'll show general status
+        
+        # Show API Server Status
+        if server_status:
+            st.markdown("""
+            <div style="background: #dcfce7; border: 1px solid #10b981; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <div style="font-weight: 600; color: #065f46; font-size: 0.9rem;">🌐 API Server</div>
+                <div style="font-size: 0.8rem; color: #065f46;">Connected and ready</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="background: #fecaca; border: 1px solid #ef4444; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <div style="font-weight: 600; color: #991b1b; font-size: 0.9rem;">🌐 API Server</div>
+                <div style="font-size: 0.8rem; color: #991b1b;">Disconnected</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Show Direct Mode Status
+        if DIRECT_MODE_AVAILABLE:
+            st.markdown("""
+            <div style="background: #dcfce7; border: 1px solid #10b981; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <div style="font-weight: 600; color: #065f46; font-size: 0.9rem;">🔧 Direct Mode</div>
+                <div style="font-size: 0.8rem; color: #065f46;">Available</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="background: #fecaca; border: 1px solid #ef4444; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <div style="font-weight: 600; color: #991b1b; font-size: 0.9rem;">🔧 Direct Mode</div>
+                <div style="font-size: 0.8rem; color: #991b1b;">Not available</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Mode selection info
+        st.markdown("""
+        <div style="background: #e0f2fe; border: 1px solid #0284c7; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+            <div style="font-weight: 600; color: #0c4a6e; font-size: 0.9rem;">💡 Mode Selection</div>
+            <div style="font-size: 0.8rem; color: #0c4a6e;">Use the sidebar to choose your preferred execution mode</div>
+        </div>
+        """, unsafe_allow_html=True)
         
         # Current configuration display
         st.markdown("### Settings")
@@ -832,15 +1065,9 @@ def main():
         """
         st.markdown(settings_html, unsafe_allow_html=True)
         
-        # Performance metrics (placeholder)
-        st.markdown("### Performance")
-        st.metric("Total Messages", len(st.session_state.messages))
-        st.metric("Events Logged", len(st.session_state.event_log))
-        
-        # Display thought process if available
-        if st.session_state.current_thought_process:
-            st.markdown("### Current Analysis")
-            st.markdown(st.session_state.current_thought_process, unsafe_allow_html=True)
+        # Simple metrics
+        st.markdown("### Stats")
+        st.metric("Messages", len(st.session_state.messages))
         
         # Quick actions
         st.markdown("### Actions")

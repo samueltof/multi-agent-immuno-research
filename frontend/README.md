@@ -1,4 +1,4 @@
- # LangManus Frontend
+# LangManus Frontend
 
 A modern, aesthetic Streamlit interface for the LangManus multiagent system.
 
@@ -26,118 +26,85 @@ A modern, aesthetic Streamlit interface for the LangManus multiagent system.
 - Performance metrics display
 - Event log viewer
 
+## 🎨 Custom Theme Configuration
+
+The Streamlit app now uses a custom theme configuration that's automatically loaded from `.streamlit/config.toml`.
+
+### Theme Settings
+- **Base**: Light theme
+- **Primary Color**: `#667eea` (Modern blue)
+- **Background**: `#ffffff` (Pure white)
+- **Secondary Background**: `#f8f9fa` (Light gray)
+- **Text Color**: `#262730` (Dark gray)
+
+### Server Settings
+- **Port**: 8501
+- **Address**: 0.0.0.0 (accessible from network)
+- **Browser stats**: Disabled for privacy
+
+## 🚀 Running the App
+
+### Method 1: Using the Run Script (Recommended)
+```bash
+# From the project root directory
+./run_app.sh
+```
+
+### Method 2: Manual Setup
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run the app
+cd frontend && streamlit run app.py
+```
+
+### Method 3: With Custom Parameters (Override defaults)
+```bash
+source .venv/bin/activate
+cd frontend
+streamlit run app.py --server.port 8502 --theme.primaryColor "#ff6b6b"
+```
+
+## 📁 Configuration Files
+
+### `.streamlit/config.toml`
+Contains all default settings for the Streamlit app:
+- Server configuration
+- Theme settings  
+- Browser options
+- Logger settings
+- Runner options
+
+## 🔧 Execution Modes
+
+The app supports three execution modes:
+
+1. **Auto** - Automatically chooses best available mode
+2. **API Only** - Forces API server execution
+3. **Direct Only** - Forces local workflow execution
+
+### Requirements for Direct Mode
+- Virtual environment must be activated
+- All dependencies must be installed in `.venv`
+- Must be run from project root or with proper path setup
+
+## 🌐 Access URLs
+
+When running with default configuration:
+- **Local**: http://localhost:8501
+- **Network**: http://[your-ip]:8501
+
+## 📝 Notes
+
+- The configuration file automatically loads when Streamlit starts
+- No need to specify theme parameters on command line anymore
+- Virtual environment activation is required for Direct Mode to work
+- Configuration can be overridden with command line parameters if needed
+
 ## Installation
 
 1. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
    ```
-
-2. **Run the Frontend**
-   ```bash
-   streamlit run app.py
-   ```
-
-3. **Configure API Connection**
-   - The default API URL is `http://localhost:8000`
-   - You can change this in the sidebar configuration
-   - Make sure your LangManus API server is running
-
-## Usage
-
-### Basic Chat
-1. Enter your message in the text area at the bottom
-2. Click "Send 🚀" to submit your query
-3. Watch the streaming response appear in real-time
-
-### Configuration Options
-
-**Debug Mode**: Enable detailed logging of the workflow execution
-
-**Deep Thinking Mode**: Activate advanced reasoning capabilities for complex queries
-
-**Search Before Planning**: Enable web search before creating execution plans
-
-### Example Queries
-
-Try these example queries to see the multiagent system in action:
-
-- "Help me create a comprehensive project plan for developing a mobile app"
-- "Analyze the pros and cons of different database technologies"
-- "Design a marketing strategy for a new SaaS product"
-- "Research the latest trends in artificial intelligence"
-
-### Advanced Features
-
-**Event Log**: Expand the "📊 Event Log" section to see real-time workflow events
-
-**Export Chat**: Download your conversation history as a JSON file
-
-**System Status**: Monitor connection status and performance metrics in the sidebar
-
-## Troubleshooting
-
-### Connection Issues
-- Ensure the LangManus API server is running on the configured port
-- Check that CORS is properly configured in the API
-- Verify the API URL in the sidebar settings
-
-### Streaming Issues
-- If responses appear slowly, check your network connection
-- Large responses may take time to process completely
-- Check the event log for any error messages
-
-### Performance
-- Clear conversation history periodically for better performance
-- Monitor the event log size (automatically limited to last 10 events)
-- Refresh the page if the interface becomes unresponsive
-
-## API Integration
-
-The frontend communicates with the LangManus API using:
-
-- **Endpoint**: `/api/chat/stream`
-- **Method**: POST
-- **Content-Type**: `application/json`
-- **Response**: Server-Sent Events (SSE)
-
-The request payload includes:
-```json
-{
-  "messages": [...],
-  "debug": false,
-  "deep_thinking_mode": false,
-  "search_before_planning": false
-}
-```
-
-## Customization
-
-### Styling
-The UI uses custom CSS defined in the main app file. You can modify:
-- Color gradients in the CSS section
-- Message bubble styling
-- Animation effects
-- Layout proportions
-
-### Configuration
-Default settings can be modified in the session state initialization:
-- API URL
-- Default configuration values
-- UI layout options
-
-## Development
-
-To contribute to the frontend:
-
-1. Fork the repository
-2. Make your changes to `app.py`
-3. Test with the LangManus API running
-4. Submit a pull request
-
-### Code Structure
-- `main()`: Main application logic
-- `display_header()`: Header component
-- `display_message()`: Message display component
-- `stream_chat_response()`: API communication and streaming
-- `get_server_status()`: Server health checking
