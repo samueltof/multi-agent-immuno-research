@@ -19,20 +19,37 @@ LangManus is a community-driven AI automation framework that builds upon the inc
 - [Download Video](https://github.com/langmanus/langmanus/blob/main/assets/demo.mp4)
 
 ## Table of Contents
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Why LangManus?](#why-langmanus)
-- [Setup](#setup)
+- [LangManus](#langmanus)
+  - [Demo Video](#demo-video)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+  - [Architecture](#architecture)
+  - [Features](#features)
+    - [Core Capabilities](#core-capabilities)
+    - [Tools and Integrations](#tools-and-integrations)
+    - [Development Features](#development-features)
+    - [Workflow Management](#workflow-management)
+  - [Why LangManus?](#why-langmanus)
+  - [Setup](#setup)
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
     - [Configuration](#configuration)
-- [Usage](#usage)
-- [Web UI](#web-ui)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
+    - [Configure Pre-commit Hook](#configure-pre-commit-hook)
+  - [Usage](#usage)
+    - [Basic Execution](#basic-execution)
+    - [Advanced Execution Options](#advanced-execution-options)
+    - [API Server](#api-server)
+    - [Advanced Configuration](#advanced-configuration)
+    - [Agent Prompts System](#agent-prompts-system)
+      - [Core Agent Roles](#core-agent-roles)
+      - [Prompt System Architecture](#prompt-system-architecture)
+  - [Web UI](#web-ui)
+  - [Development](#development)
+    - [Testing](#testing)
+    - [Code Quality](#code-quality)
+  - [Contributing](#contributing)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
 
 ## Quick Start
 
@@ -206,11 +223,43 @@ The pre-commit hook will automatically:
 
 ### Basic Execution
 
-To run LangManus with default settings:
+To run LangManus with default settings (both deep thinking and search before planning enabled):
 
 ```bash
 uv run main.py
 ```
+
+You can also pass your query directly as an argument:
+
+```bash
+uv run main.py "What is machine learning?"
+```
+
+### Advanced Execution Options
+
+LangManus supports several command line options to control the workflow behavior:
+
+```bash
+# Show all available options
+uv run main.py --help
+
+# Disable deep thinking mode (for faster but less thorough responses)
+uv run main.py --no-deep-thinking "Your query here"
+
+# Disable search before planning (skip initial research phase)
+uv run main.py --no-search-before-planning "Your query here"
+
+# Disable both modes for fastest execution
+uv run main.py --no-deep-thinking --no-search-before-planning "Your query here"
+
+# Explicitly enable modes (default behavior)
+uv run main.py --deep-thinking --search-before-planning "Your query here"
+```
+
+**Command Line Options:**
+- `--deep-thinking` / `--no-deep-thinking`: Enable/disable deep thinking mode (default: enabled)
+- `--search-before-planning` / `--no-search-before-planning`: Enable/disable search before planning (default: enabled)
+- `--help`: Show usage information and available options
 
 ### API Server
 

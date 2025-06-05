@@ -20,11 +20,13 @@ logger = logging.getLogger(__name__)
 graph = build_graph()
 
 
-def run_agent_workflow(user_input: str, debug: bool = False):
+def run_agent_workflow(user_input: str, deep_thinking_mode: bool = True, search_before_planning: bool = True, debug: bool = False):
     """Run the agent workflow with the given user input.
 
     Args:
         user_input: The user's query or request
+        deep_thinking_mode: If True, enables deep thinking mode (default: True)
+        search_before_planning: If True, enables search before planning (default: True)
         debug: If True, enables debug level logging
 
     Returns:
@@ -37,14 +39,17 @@ def run_agent_workflow(user_input: str, debug: bool = False):
         enable_debug_logging()
 
     logger.info(f"Starting workflow with user input: {user_input}")
+    logger.info(f"Deep thinking mode: {deep_thinking_mode}")
+    logger.info(f"Search before planning: {search_before_planning}")
+    
     result = graph.invoke(
         {
             # Constants
             "TEAM_MEMBERS": TEAM_MEMBERS,
             # Runtime Variables
             "messages": [{"role": "user", "content": user_input}],
-            "deep_thinking_mode": True,
-            "search_before_planning": True,
+            "deep_thinking_mode": deep_thinking_mode,
+            "search_before_planning": search_before_planning,
         }
     )
     logger.debug(f"Final workflow state: {result}")
