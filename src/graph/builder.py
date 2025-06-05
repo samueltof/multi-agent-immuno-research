@@ -10,6 +10,7 @@ from .nodes import (
     reporter_node,
     planner_node,
     data_analyst_node,
+    biomedical_researcher_graph_node,
 )
 
 
@@ -25,4 +26,5 @@ def build_graph():
     builder.add_node("browser", browser_node)
     builder.add_node("reporter", reporter_node)
     builder.add_node("data_analyst", data_analyst_node)
+    builder.add_node("biomedical_researcher", biomedical_researcher_graph_node)
     return builder.compile()

@@ -17,6 +17,9 @@ from src.tools import (
 from .llm import get_llm_by_type
 from src.config.agents import AGENT_LLM_MAP
 from .data_team import create_data_team_graph
+from .biomedical_researcher import (
+    biomedical_researcher_wrapper
+)
 
 # Create agents using configured LLM types
 research_agent = create_react_agent(
@@ -63,3 +66,43 @@ def data_analyst_agent(state):
     
     # Return the result in the expected format
     return result
+
+# Biomedical researcher agent (PydanticAI + MCP integration)
+def biomedical_researcher_agent(state):
+    """
+    Biomedical researcher agent that uses PydanticAI with MCP servers.
+    This integrates the PydanticAI biomedical researcher with LangGraph.
+    """
+    import asyncio
+    from .biomedical_researcher import biomedical_researcher_node
+    
+    # Run the biomedical researcher node asynchronously
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(biomedical_researcher_node(state))
+        
+        # Convert the result to LangGraph compatible format
+        messages = result.get("messages", [])
+        if messages:
+            # Get the last message which should be the research summary
+            last_message = messages[-1]
+            return {
+                "messages": [{"role": "assistant", "content": last_message}]
+            }
+        else:
+            # Fallback if no messages in result
+            return {
+                "messages": [{"role": "assistant", "content": "Biomedical research completed successfully."}]
+            }
+    finally:
+        loop.close()
+
+# Make all agents available for import
+__all__ = [
+    "research_agent",
+    "coder_agent", 
+    "browser_agent",
+    "data_analyst_agent",
+    "biomedical_researcher_agent",
+]

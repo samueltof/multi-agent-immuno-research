@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from langgraph.graph import END
 
-from src.agents import research_agent, coder_agent, browser_agent, data_analyst_agent
+from src.agents import research_agent, coder_agent, browser_agent, data_analyst_agent, biomedical_researcher_agent
 from src.agents.llm import get_llm_by_type
 from src.config import TEAM_MEMBERS
 from src.config.agents import AGENT_LLM_MAP
@@ -103,7 +103,28 @@ def data_analyst_node(state: State) -> Command[Literal["supervisor"]]:
     )
 
 
-def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["__end__"]]]:
+def biomedical_researcher_graph_node(state: State) -> Command[Literal["supervisor"]]:
+    """Node for the biomedical researcher agent that performs biomedical research using PydanticAI and MCP."""
+    logger.info("Biomedical researcher agent starting task")
+    result = biomedical_researcher_agent(state)
+    logger.info("Biomedical researcher agent completed task")
+    logger.debug(f"Biomedical researcher agent response: {result['messages'][-1].content}")
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(
+                    content=RESPONSE_FORMAT.format(
+                        "biomedical_researcher", result["messages"][-1].content
+                    ),
+                    name="biomedical_researcher",
+                )
+            ]
+        },
+        goto="supervisor",
+    )
+
+
+def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["biomedical_researcher"], Literal["__end__"]]]:
     """Supervisor node that decides which agent should act next."""
     logger.info("Supervisor evaluating next action")
     messages = apply_prompt_template("supervisor", state)
