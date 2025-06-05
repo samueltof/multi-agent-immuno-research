@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Union
 from typing_extensions import TypedDict
 from langgraph.graph import MessagesState
 
@@ -11,7 +11,7 @@ OPTIONS = TEAM_MEMBERS + ["FINISH"]
 class Router(TypedDict):
     """Worker to route to next. If no workers needed, route to FINISH."""
 
-    next: Literal[*OPTIONS]
+    next: Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["FINISH"]]
 
 
 class State(MessagesState):

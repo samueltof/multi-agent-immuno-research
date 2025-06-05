@@ -1,12 +1,12 @@
 import logging
 import json
 from copy import deepcopy
-from typing import Literal
+from typing import Literal, Union
 from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from langgraph.graph import END
 
-from src.agents import research_agent, coder_agent, browser_agent
+from src.agents import research_agent, coder_agent, browser_agent, data_analyst_agent
 from src.agents.llm import get_llm_by_type
 from src.config import TEAM_MEMBERS
 from src.config.agents import AGENT_LLM_MAP
@@ -82,7 +82,28 @@ def browser_node(state: State) -> Command[Literal["supervisor"]]:
     )
 
 
-def supervisor_node(state: State) -> Command[Literal[*TEAM_MEMBERS, "__end__"]]:
+def data_analyst_node(state: State) -> Command[Literal["supervisor"]]:
+    """Node for the data analyst agent that performs SQL queries and database analysis."""
+    logger.info("Data analyst agent starting task")
+    result = data_analyst_agent(state)
+    logger.info("Data analyst agent completed task")
+    logger.debug(f"Data analyst agent response: {result['messages'][-1].content}")
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(
+                    content=RESPONSE_FORMAT.format(
+                        "data_analyst", result["messages"][-1].content
+                    ),
+                    name="data_analyst",
+                )
+            ]
+        },
+        goto="supervisor",
+    )
+
+
+def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["__end__"]]]:
     """Supervisor node that decides which agent should act next."""
     logger.info("Supervisor evaluating next action")
     messages = apply_prompt_template("supervisor", state)
