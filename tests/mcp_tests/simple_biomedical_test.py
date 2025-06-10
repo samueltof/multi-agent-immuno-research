@@ -34,8 +34,9 @@ EXAMPLE_QUESTIONS = [
     {
         "question": "Search for latest preprints on AI in drug discovery",
         "server": "BioRxiv", 
-        "tool": "search_preprints_by_date",
+        "tool": "search_preprints",
         "args": {
+            "server": "biorxiv",
             "start_date": "2024-01-01", 
             "end_date": "2024-12-31",
             "category": "bioinformatics",
@@ -43,10 +44,10 @@ EXAMPLE_QUESTIONS = [
         }
     },
     {
-        "question": "What are the genetic targets associated with cancer?",
+        "question": "What are the genetic targets like BRCA1 and TP53?",
         "server": "OpenTargets",
         "tool": "search_targets", 
-        "args": {"query": "cancer", "size": 3}
+        "args": {"query": "BRCA1", "max_results": 3}
     }
 ]
 
@@ -103,6 +104,16 @@ async def test_biomedical_question(question_data):
                     for content_item in result.content:
                         if hasattr(content_item, 'text'):
                             text = content_item.text
+                            
+                            # Check for error indicators in the response
+                            if ("error" in text.lower() or 
+                                "unknown tool" in text.lower() or
+                                "404 not found" in text.lower() or
+                                text.startswith("Error")):
+                                print("❌ Error detected in response:")
+                                print(text)
+                                return False
+                            
                             # Truncate very long responses
                             if len(text) > 1000:
                                 text = text[:1000] + "\n... [truncated]"
@@ -110,7 +121,15 @@ async def test_biomedical_question(question_data):
                         else:
                             print(str(content_item))
                 else:
-                    print(str(result))
+                    result_str = str(result)
+                    # Check for error indicators in the response
+                    if ("error" in result_str.lower() or 
+                        "unknown tool" in result_str.lower() or
+                        "404 not found" in result_str.lower()):
+                        print("❌ Error detected in response:")
+                        print(result_str)
+                        return False
+                    print(result_str)
                 
                 return True
                 
