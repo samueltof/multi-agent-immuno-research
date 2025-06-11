@@ -13,6 +13,5 @@ AGENT_LLM_MAP: dict[str, LLMType] = {
     "browser": "vision", 
     "reporter": "basic", 
     "data_analyst": "reasoning",
-    "tcr_data_analyst": "reasoning",  # TCR-specialized data analyst
     "biomedical_researcher": "reasoning"  # New biomedical agent using reasoning model
 }

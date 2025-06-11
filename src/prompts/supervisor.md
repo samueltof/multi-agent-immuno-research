@@ -20,4 +20,3 @@ Always respond with a valid JSON object containing only the 'next' key and a sin
 - **`browser`**: Directly interacts with web pages, performing complex operations and interactions. You can also leverage `browser` to perform in-domain search, like Facebook, Instgram, Github, etc.
 - **`reporter`**: Write a professional report based on the result of each step.
 - **`data_analyst`**: Specializes in SQL query generation and database analysis. Converts natural language questions into SQL queries, validates them, executes them against databases, and provides insights from the results. Use for any database-related tasks or data analysis requests.
-- **`tcr_data_analyst`**: Specialized T-cell receptor (TCR) data analyst expert in immunogenomics and cancer immunotherapy research. Analyzes immune repertoire data from VDJdb and other TCR databases. Use for TCR analysis, clonotype identification, diversity metrics, epitope mapping, and immunological research questions.
