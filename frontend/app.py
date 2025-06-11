@@ -22,7 +22,7 @@ except ImportError:
 
 # Page configuration
 st.set_page_config(
-    page_title="LangManus - Multiagent System",
+    page_title="DataManus",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -367,7 +367,7 @@ def display_header():
     """Display the main header"""
     st.markdown("""
     <div style="text-align: center; padding: 2rem 1rem; margin-bottom: 2rem;">
-        <h1 style="color: #1e3a8a; font-weight: 600; margin: 0;">LangManus</h1>
+        <h1 style="color: #1e3a8a; font-weight: 600; margin: 0;">DataManus</h1>
     </div>
     """, unsafe_allow_html=True)
 
@@ -718,7 +718,7 @@ def main():
         api_url = st.text_input(
             "API URL",
             value=st.session_state.api_url,
-            help="The URL of your LangManus API server"
+            help="The URL of your DataManus API server"
         )
         st.session_state.api_url = api_url
         
@@ -1081,7 +1081,7 @@ def main():
                 st.download_button(
                     "Download JSON",
                     chat_export,
-                    file_name=f"langmanus_chat_{int(time.time())}.json",
+                    file_name=f"DataManus_chat_{int(time.time())}.json",
                     mime="application/json",
                     use_container_width=True
                 )
