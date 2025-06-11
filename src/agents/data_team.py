@@ -51,20 +51,24 @@ class DataTeamState(MessagesState):
 
 # Initial prompt for the data analysis ReAct agent
 REACT_AGENT_INITIAL_PROMPT = """
-You are a data analyst expert tasked with generating SQLite SQL queries based on user requests OR providing the database schema when asked.
-You have access to tools to fetch the database schema (`get_database_schema`) and get random data samples (`get_random_subsamples`).
+You are a data analyst expert tasked with generating SQLite SQL queries based on user requests OR providing sample data when asked.
+You have access to tools to get random data samples (`get_random_subsamples`).
+
+**IMPORTANT: The database schema has been provided to you below. Use the EXACT table and column names from this schema!**
 
 Your goal is to:
 1. Analyze the user's query: 
 <user_query>    
 {query}
 </user_query>
-2. **If the user is asking for the database schema:** Use the `get_database_schema` tool. Once you receive the schema description from the tool, **respond ONLY with that exact schema description** provided by the tool, without any additional text or SQL.
-3. **If the user is asking for sample data:** Use the `get_random_subsamples` tool with appropriate table and column specifications.
-4. **If the user is asking a question that requires data from the database:**
-    a. Use the `get_database_schema` tool *if* you need it to understand the tables and columns.
-    b. Once you have the necessary information (schema, if required), generate the appropriate SQLite SQL query.
-    c. Respond ONLY with the final SQL query itself, without any introductory text, explanations, or markdown formatting like ```sql.
+2. **If the user is asking for sample data:** Use the `get_random_subsamples` tool with appropriate table and column specifications.
+3. **If the user is asking a question that requires data from the database:**
+    
+    **STEP 1:** Analyze the provided schema below to identify relevant tables and columns.
+    **STEP 2:** Generate SQLite SQL query using ONLY the table and column names from the provided schema.
+    **STEP 3:** Respond ONLY with the final SQL query itself, without any introductory text, explanations, or markdown formatting like ```sql.
+    
+    **CRITICAL: Use ONLY the table and column names provided in the schema below!**
 
 Query guidelines:
 - Do not under any circumstance use SELECT * in your query.
@@ -109,6 +113,20 @@ Respond with the required structure.
     input_variables=["schema", "query", "sql"],
 )
 
+def get_schema_node(state: DataTeamState) -> Dict[str, Any]:
+    """Automatically gets the database schema before SQL generation."""
+    logger.info("👨‍💻 DATA TEAM: Getting database schema automatically...")
+    
+    try:
+        # Get the schema using the tool
+        schema_result = get_database_schema.invoke({})
+        logger.info("👨‍💻 DATA TEAM: Schema retrieved successfully")
+        return {"schema": schema_result}
+    except Exception as e:
+        error_msg = f"Failed to get database schema: {str(e)}"
+        logger.error(f"👨‍💻 DATA TEAM: {error_msg}")
+        return {"error_message": error_msg}
+
 def prepare_data_query_node(state: DataTeamState) -> Dict[str, Any]:
     """Extracts the latest user query and prepares the initial message for the ReAct agent."""
     logger.info("👨‍💻 DATA TEAM: Preparing query for ReAct agent...")
@@ -136,10 +154,19 @@ def prepare_data_query_node(state: DataTeamState) -> Dict[str, Any]:
 
 Retry Feedback: You previously generated SQL that failed validation with the following feedback: '{retry_feedback}'. Please analyze this feedback and generate a corrected query."""
     
+    # Include schema in the prompt if available
+    schema_text = state.get("schema", "")
+    schema_prompt_addition = ""
+    if schema_text:
+        schema_prompt_addition = f"""
+
+DATABASE SCHEMA (Use these exact table and column names):
+{schema_text}"""
+    
     initial_prompt = REACT_AGENT_INITIAL_PROMPT.format(
         query=last_human_message_content,
         retry_feedback=retry_prompt_addition
-    )
+    ) + schema_prompt_addition
 
     return {
         "messages": [HumanMessage(content=initial_prompt)],
@@ -353,12 +380,14 @@ def create_data_team_graph(llm_client: Any):
     workflow = StateGraph(DataTeamState)
 
     # Create the ReAct agent for SQL generation with database tools
-    sql_generating_agent = create_react_agent(llm_client, tools=[get_database_schema, get_random_subsamples])
+    # Note: get_database_schema removed since we get it automatically in get_schema_node
+    sql_generating_agent = create_react_agent(llm_client, tools=[get_random_subsamples])
     
     # Bind the llm_client to the validation node
     validate_sql_with_llm = partial(sql_validator_node, llm_client=llm_client)
 
     # Add nodes
+    workflow.add_node("get_schema", get_schema_node)
     workflow.add_node("prepare_query", prepare_data_query_node)
     workflow.add_node("sql_generating_agent", sql_generating_agent)
     workflow.add_node("extract_schema_or_sql", extract_schema_or_sql_node)
@@ -375,9 +404,11 @@ def create_data_team_graph(llm_client: Any):
     })
 
     # Set entry point
-    workflow.set_entry_point("prepare_query")
+    workflow.set_entry_point("get_schema")
 
     # Add edges
+    workflow.add_edge("get_schema", "prepare_query")
+    
     workflow.add_conditional_edges(
         "prepare_query",
         check_for_errors_before_agent,
@@ -409,7 +440,7 @@ def create_data_team_graph(llm_client: Any):
         },
     )
 
-    workflow.add_edge("increment_retry", "prepare_query")
+    workflow.add_edge("increment_retry", "get_schema")
 
     workflow.add_conditional_edges(
         "execute_sql",
