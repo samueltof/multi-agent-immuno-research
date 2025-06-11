@@ -397,7 +397,7 @@ def extract_thought_process(content: str) -> str:
     return ""
 
 def format_agent_content(content: str) -> str:
-    """Format agent content to make it more readable - simplified version"""
+    """Format agent content as plain text without markdown"""
     try:
         # Try to parse as JSON first
         if content.strip().startswith('{') and content.strip().endswith('}'):
@@ -406,13 +406,13 @@ def format_agent_content(content: str) -> str:
             
             # Handle thought processes - extract just the essential text
             if "thought" in data and "title" in data:
-                result = f"💭 **Agent Analysis**\n\n"
-                result += f"**Thought Process:** {data['thought']}\n\n"
-                result += f"**Plan Title:** {data['title']}\n\n"
+                result = f"Agent Analysis\n\n"
+                result += f"Thought Process: {data['thought']}\n\n"
+                result += f"Plan Title: {data['title']}\n\n"
                 
                 # Add steps if they exist
                 if "steps" in data and isinstance(data["steps"], list):
-                    result += "**Execution Plan:**\n"
+                    result += "Execution Plan:\n"
                     for i, step in enumerate(data["steps"], 1):
                         agent_icons = {
                             "researcher": "🔍",
@@ -425,7 +425,7 @@ def format_agent_content(content: str) -> str:
                         }
                         agent_icon = agent_icons.get(step.get("agent_name"), "🤖")
                         
-                        result += f"\n{i}. {agent_icon} **{step.get('title', 'Untitled')}** ({step.get('agent_name', 'unknown').title()})\n"
+                        result += f"\n{i}. {agent_icon} {step.get('title', 'Untitled')} ({step.get('agent_name', 'unknown').title()})\n"
                         result += f"   {step.get('description', '')}\n"
                         if step.get("note"):
                             result += f"   💡 {step.get('note')}\n"
@@ -459,35 +459,33 @@ def format_agent_content(content: str) -> str:
         return content
 
 def display_message(message: Dict[str, str], is_user: bool = False):
-    """Display a chat message with simplified styling"""
+    """Display a chat message with plain text styling"""
     role = message.get("role", "assistant")
     content = message.get("content", "")
     
     if role == "user":
-        icon = "👤"
         # User messages in blue background
         st.markdown(f"""
         <div style="background: #1e3a8a; color: white; padding: 1rem; border-radius: 10px; margin: 1rem 3rem 1rem 0;">
             <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="margin-right: 0.5rem;">{icon}</span>
+                <span style="margin-right: 0.5rem;">👤</span>
                 <strong>You</strong>
             </div>
-            <div>{content}</div>
+            <div style="white-space: pre-wrap;">{content}</div>
         </div>
         """, unsafe_allow_html=True)
     else:
-        icon = "🤖"
-        # Format assistant content for better readability but keep it simple
+        # Format assistant content as plain text
         formatted_content = format_agent_content(content)
         
-        # Assistant messages in light background
+        # Assistant messages in light background with plain text
         st.markdown(f"""
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
             <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="margin-right: 0.5rem;">{icon}</span>
+                <span style="margin-right: 0.5rem;">🤖</span>
                 <strong>Assistant</strong>
             </div>
-            <div style="white-space: pre-wrap; font-family: inherit;">{formatted_content}</div>
+            <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{formatted_content}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -550,7 +548,7 @@ async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
                         delta_content = event_data["delta"]["content"]
                         current_response += delta_content
                         
-                        # Update display with streaming content
+                        # Update display with plain text streaming content
                         with response_container:
                             if current_response.strip():
                                 st.markdown(f"""
@@ -562,7 +560,7 @@ async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
                                             <div class="streaming-dot"></div>Processing...
                                         </span>
                                     </div>
-                                    <div style="white-space: pre-wrap; font-family: inherit;">{format_agent_content(current_response.strip())}</div>
+                                    <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{format_agent_content(current_response.strip())}</div>
                                 </div>
                                 """, unsafe_allow_html=True)
                 
@@ -649,10 +647,10 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
                                 delta_content = event_data["delta"]["content"]
                                 current_response += delta_content
                                 
-                                # Update display with clean content as it streams
+                                # Update display with plain text content as it streams
                                 with response_container:
                                     if current_response.strip():
-                                        # Show the streaming content in a clean format
+                                        # Show the streaming content as plain text
                                         st.markdown(f"""
                                         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
                                             <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
@@ -662,7 +660,7 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
                                                     <div class="streaming-dot"></div>Thinking...
                                                 </span>
                                             </div>
-                                            <div style="white-space: pre-wrap; font-family: inherit;">{format_agent_content(current_response.strip())}</div>
+                                            <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{format_agent_content(current_response.strip())}</div>
                                         </div>
                                         """, unsafe_allow_html=True)
                         
