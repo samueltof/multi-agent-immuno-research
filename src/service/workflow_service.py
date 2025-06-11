@@ -195,12 +195,20 @@ async def run_agent_workflow(
             }
             yield ydata
         elif kind == "on_tool_end" and node in TEAM_MEMBERS:
+            # Handle different output types - some tools return strings, others return objects with .content
+            output = data.get("output", "")
+            if hasattr(output, 'content'):
+                tool_result = output.content
+            else:
+                # For tools that return strings directly (like execute_sql_query)
+                tool_result = str(output) if output else ""
+            
             ydata = {
                 "event": "tool_call_result",
                 "data": {
                     "tool_call_id": f"{workflow_id}_{node}_{name}_{run_id}",
                     "tool_name": name,
-                    "tool_result": data["output"].content if data.get("output") else "",
+                    "tool_result": tool_result,
                 },
             }
             yield ydata
