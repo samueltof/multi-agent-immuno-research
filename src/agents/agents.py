@@ -67,6 +67,34 @@ def data_analyst_agent(state):
     # Return the result in the expected format
     return result
 
+# Create TCR-specialized data analyst workflow
+from .tcr_data_team import create_tcr_data_team_graph
+tcr_data_analyst_workflow = create_tcr_data_team_graph(get_llm_by_type(AGENT_LLM_MAP["data_analyst"]))
+
+def tcr_data_analyst_agent(state):
+    """
+    Specialized TCR data analyst agent for immunogenomics research.
+    This agent is optimized for T-cell receptor analysis using VDJdb and similar databases.
+    """
+    # Add the TCR data analyst prompt context to the state
+    prompt_state = apply_prompt_template("tcr_data_analyst", state)
+    
+    # Create input state for the TCR data team workflow
+    workflow_input = {
+        "messages": prompt_state,
+        "TEAM_MEMBERS": state.get("TEAM_MEMBERS", []),
+        "next": state.get("next", ""),
+        "full_plan": state.get("full_plan", ""),
+        "deep_thinking_mode": state.get("deep_thinking_mode", False),
+        "search_before_planning": state.get("search_before_planning", False),
+    }
+    
+    # Run the TCR data team workflow
+    result = tcr_data_analyst_workflow.invoke(workflow_input)
+    
+    # Return the result in the expected format
+    return result
+
 # Biomedical researcher agent (PydanticAI + MCP integration)
 def biomedical_researcher_agent(state):
     """
@@ -104,5 +132,6 @@ __all__ = [
     "coder_agent", 
     "browser_agent",
     "data_analyst_agent",
+    "tcr_data_analyst_agent",
     "biomedical_researcher_agent",
 ]
