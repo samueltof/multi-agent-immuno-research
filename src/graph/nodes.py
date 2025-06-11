@@ -108,13 +108,21 @@ def biomedical_researcher_graph_node(state: State) -> Command[Literal["superviso
     logger.info("Biomedical researcher agent starting task")
     result = biomedical_researcher_agent(state)
     logger.info("Biomedical researcher agent completed task")
-    logger.debug(f"Biomedical researcher agent response: {result['messages'][-1].content}")
+    
+    # Handle the case where result['messages'][-1] is a dict with 'content' key
+    last_message = result['messages'][-1]
+    if isinstance(last_message, dict):
+        message_content = last_message.get('content', str(last_message))
+    else:
+        message_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
+    
+    logger.debug(f"Biomedical researcher agent response: {message_content}")
     return Command(
         update={
             "messages": [
                 HumanMessage(
                     content=RESPONSE_FORMAT.format(
-                        "biomedical_researcher", result["messages"][-1].content
+                        "biomedical_researcher", message_content
                     ),
                     name="biomedical_researcher",
                 )
@@ -167,23 +175,70 @@ def planner_node(state: State) -> Command[Literal["supervisor", "__end__"]]:
     logger.debug(f"Current state messages: {state['messages']}")
     logger.debug(f"Planner response: {full_response}")
 
-    if full_response.startswith("```json"):
-        full_response = full_response.removeprefix("```json")
+    # Clean up the response - strip whitespace and code block markers
+    cleaned_response = full_response.strip()
+    
+    # More robust code block removal
+    if cleaned_response.startswith("```json"):
+        cleaned_response = cleaned_response.removeprefix("```json").strip()
+    elif cleaned_response.startswith("```"):
+        cleaned_response = cleaned_response.removeprefix("```").strip()
 
-    if full_response.endswith("```"):
-        full_response = full_response.removesuffix("```")
+    if cleaned_response.endswith("```"):
+        cleaned_response = cleaned_response.removesuffix("```").strip()
+
+    # Try to extract JSON from the response if it contains extra text
+    json_start = cleaned_response.find('{')
+    json_end = cleaned_response.rfind('}')
+    
+    if json_start != -1 and json_end != -1 and json_end > json_start:
+        # Extract just the JSON part
+        potential_json = cleaned_response[json_start:json_end + 1]
+        # If this looks more like pure JSON, use it instead
+        if len(potential_json) < len(cleaned_response) * 0.8:  # JSON is less than 80% of total
+            logger.debug(f"Extracted JSON from response: {potential_json}")
+            cleaned_response = potential_json
 
     goto = "supervisor"
     try:
-        json.loads(full_response)
-    except json.JSONDecodeError:
-        logger.warning("Planner response is not a valid JSON")
+        # Validate JSON structure
+        parsed_json = json.loads(cleaned_response)
+        
+        # Validate required fields for Plan interface
+        required_fields = ["thought", "title", "steps"]
+        missing_fields = [field for field in required_fields if field not in parsed_json]
+        
+        if missing_fields:
+            logger.warning(f"Planner response missing required fields: {missing_fields}")
+            logger.debug(f"Invalid plan structure: {cleaned_response}")
+            goto = "__end__"
+        else:
+            # Validate steps structure
+            if not isinstance(parsed_json["steps"], list):
+                logger.warning("Planner response 'steps' field is not a list")
+                goto = "__end__"
+            else:
+                # Validate each step has required fields
+                for i, step in enumerate(parsed_json["steps"]):
+                    step_required_fields = ["agent_name", "title", "description"]
+                    step_missing_fields = [field for field in step_required_fields if field not in step]
+                    if step_missing_fields:
+                        logger.warning(f"Step {i} missing required fields: {step_missing_fields}")
+                        goto = "__end__"
+                        break
+                        
+    except json.JSONDecodeError as e:
+        logger.warning(f"Planner response is not valid JSON: {str(e)}")
+        logger.debug(f"Invalid JSON response: {cleaned_response}")
+        goto = "__end__"
+    except Exception as e:
+        logger.error(f"Unexpected error validating planner response: {str(e)}")
         goto = "__end__"
 
     return Command(
         update={
-            "messages": [HumanMessage(content=full_response, name="planner")],
-            "full_plan": full_response,
+            "messages": [HumanMessage(content=cleaned_response, name="planner")],
+            "full_plan": cleaned_response,
         },
         goto=goto,
     )

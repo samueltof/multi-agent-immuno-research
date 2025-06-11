@@ -194,6 +194,7 @@ def create_biomedical_researcher_agent():
         deps_type=BiomedicalResearchDeps,
         output_type=BiomedicalResearchOutput,
         mcp_servers=create_biomedical_mcp_servers(),
+        retries=3,  # Add retry configuration
         system_prompt="""You are an expert biomedical researcher AI assistant specializing in comprehensive literature review, 
         clinical research analysis, and drug discovery research. You have access to multiple biomedical databases through 
         specialized tools.
@@ -213,16 +214,26 @@ def create_biomedical_researcher_agent():
         5. Highlight any limitations or gaps in the available data
         6. Suggest follow-up research directions when appropriate
 
-        Structure your responses to include:
-        - A clear summary of findings
-        - Key insights and discoveries
-        - Relevant sources and citations
-        - Actionable recommendations
-        - An assessment of confidence level in the findings
+        IMPORTANT: Always respond with valid JSON structure containing:
+        - summary: A string summarizing the research findings
+        - key_findings: A list of strings with key insights
+        - sources: A list of objects with source information (each with title, pmid/url keys)
+        - recommendations: A list of strings with actionable recommendations
+        - confidence_level: A float between 0.0 and 1.0 indicating confidence
+
+        Example response format:
+        {
+            "summary": "Cancer immunogenomics focuses on...",
+            "key_findings": ["Finding 1", "Finding 2"],
+            "sources": [{"title": "Paper Title", "pmid": "12345"}],
+            "recommendations": ["Recommendation 1"],
+            "confidence_level": 0.8
+        }
         """,
         instructions="""Focus on providing comprehensive, evidence-based biomedical research insights. 
         Use the available biomedical database tools to gather information from multiple sources. 
-        Always cite your sources and provide confidence assessments for your findings."""
+        Always cite your sources and provide confidence assessments for your findings.
+        Ensure your response follows the exact JSON structure required."""
     )
 
 # Initialize the agent
@@ -323,7 +334,62 @@ class BiomedicalResearcherWrapper:
             return result.data
         except Exception as e:
             logger.error(f"Error in biomedical research: {e}")
-            # Return a fallback response
+            
+            # If it's a validation error, try to extract useful information from the error
+            if "result validation" in str(e).lower() or "exceeded maximum retries" in str(e).lower():
+                logger.warning("PydanticAI validation failed, falling back to basic LLM")
+                # Fall back to basic LLM approach
+                base_llm = get_llm_by_type(AGENT_LLM_MAP["biomedical_researcher"])
+                
+                prompt = f"""You are a biomedical researcher. Research the following query and provide structured information:
+
+Query: {query}
+
+Please respond with a JSON structure containing:
+- summary: A clear summary of the research topic
+- key_findings: A list of key insights (even if limited)
+- sources: A list of relevant sources you know about
+- recommendations: A list of research recommendations
+- confidence_level: A number between 0 and 1
+
+Example response:
+{{
+    "summary": "Your research summary here",
+    "key_findings": ["Finding 1", "Finding 2"],
+    "sources": [{{"title": "Source Title", "url": "N/A"}}],
+    "recommendations": ["Recommendation 1"],
+    "confidence_level": 0.5
+}}"""
+                
+                try:
+                    response = await base_llm.ainvoke(prompt)
+                    content = response.content if hasattr(response, 'content') else str(response)
+                    
+                    # Try to parse the JSON response
+                    import json
+                    try:
+                        parsed_data = json.loads(content)
+                        return BiomedicalResearchOutput(**parsed_data)
+                    except (json.JSONDecodeError, TypeError):
+                        # If JSON parsing fails, create a basic response
+                        return BiomedicalResearchOutput(
+                            summary=content[:500] + "..." if len(content) > 500 else content,
+                            key_findings=["Validation error occurred - using fallback response"],
+                            sources=[{"title": "Fallback Response", "url": "N/A"}],
+                            recommendations=["Check PydanticAI configuration and try again"],
+                            confidence_level=0.3
+                        )
+                except Exception as fallback_error:
+                    logger.error(f"Error in fallback biomedical research: {fallback_error}")
+                    return BiomedicalResearchOutput(
+                        summary=f"Multiple errors occurred: {str(e)} | Fallback error: {str(fallback_error)}",
+                        key_findings=[],
+                        sources=[],
+                        recommendations=["Check configuration and try again"],
+                        confidence_level=0.0
+                    )
+            
+            # Return a fallback response for other errors
             return BiomedicalResearchOutput(
                 summary=f"Error occurred during research: {str(e)}",
                 key_findings=[],
