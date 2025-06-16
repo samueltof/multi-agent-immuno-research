@@ -411,7 +411,7 @@ def extract_thought_process(content: str) -> str:
     return ""
 
 def format_agent_content(content: str) -> str:
-    """Format agent content as plain text without markdown"""
+    """Format agent content with proper markdown support for tables and structured data"""
     try:
         # Try to parse as JSON first
         if content.strip().startswith('{') and content.strip().endswith('}'):
@@ -420,13 +420,13 @@ def format_agent_content(content: str) -> str:
             
             # Handle thought processes - extract just the essential text
             if "thought" in data and "title" in data:
-                result = f"Agent Analysis\n\n"
-                result += f"Thought Process: {data['thought']}\n\n"
-                result += f"Plan Title: {data['title']}\n\n"
+                result = f"**Agent Analysis**\n\n"
+                result += f"**Thought Process:** {data['thought']}\n\n"
+                result += f"**Plan Title:** {data['title']}\n\n"
                 
                 # Add steps if they exist
                 if "steps" in data and isinstance(data["steps"], list):
-                    result += "Execution Plan:\n"
+                    result += "**Execution Plan:**\n\n"
                     for i, step in enumerate(data["steps"], 1):
                         agent_icons = {
                             "researcher": "🔍",
@@ -439,10 +439,11 @@ def format_agent_content(content: str) -> str:
                         }
                         agent_icon = agent_icons.get(step.get("agent_name"), "🤖")
                         
-                        result += f"\n{i}. {agent_icon} {step.get('title', 'Untitled')} ({step.get('agent_name', 'unknown').title()})\n"
+                        result += f"{i}. {agent_icon} **{step.get('title', 'Untitled')}** ({step.get('agent_name', 'unknown').title()})\n"
                         result += f"   {step.get('description', '')}\n"
                         if step.get("note"):
                             result += f"   💡 {step.get('note')}\n"
+                        result += "\n"
                 
                 return result
             
@@ -451,23 +452,46 @@ def format_agent_content(content: str) -> str:
                 # Extract key fields if they exist
                 result = ""
                 if "content" in data:
-                    result += f"{data['content']}\n"
+                    result += f"{data['content']}"
                 elif "message" in data:
-                    result += f"{data['message']}\n"
+                    result += f"{data['message']}"
                 elif "text" in data:
-                    result += f"{data['text']}\n"
+                    result += f"{data['text']}"
                 else:
                     # If no recognizable structure, show the raw content but cleaner
                     result = str(data)
                 
                 return result
         
-        # If not JSON, return as-is
+        # If not JSON, return as-is but ensure proper markdown formatting for tables
         else:
+            # Clean up any malformed table syntax that might occur during streaming
+            content = content.strip()
+            
+            # If content contains table markers, ensure proper spacing
+            if '|' in content and ('---' in content or '___' in content):
+                # This looks like a table, ensure proper markdown table format
+                lines = content.split('\n')
+                formatted_lines = []
+                for line in lines:
+                    if '|' in line:
+                        # Clean up table row spacing
+                        line = line.strip()
+                        if line.startswith('|') and line.endswith('|'):
+                            formatted_lines.append(line)
+                        elif '|' in line:
+                            # Ensure proper table formatting
+                            formatted_lines.append(line)
+                        else:
+                            formatted_lines.append(line)
+                    else:
+                        formatted_lines.append(line)
+                content = '\n'.join(formatted_lines)
+            
             return content
             
     except json.JSONDecodeError:
-        # If JSON parsing fails, return as plain text
+        # If JSON parsing fails, return as markdown text
         return content
     except Exception:
         return content
@@ -529,15 +553,16 @@ def display_message(message: Dict[str, str], is_user: bool = False):
         
         # Display the text content first
         if formatted_content.strip():  # Only show text if there's content after cleaning
+            # Display simple header without chat window styling
             st.markdown(f"""
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="margin-right: 0.5rem;">🤖</span>
-                    <strong>Assistant</strong>
-                </div>
-                <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{formatted_content}</div>
+            <div style="display: flex; align-items: center; margin: 1rem 0 0.5rem 0;">
+                <span style="margin-right: 0.5rem;">🤖</span>
+                <strong>Assistant</strong>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Display content using Streamlit's markdown for proper table rendering
+            st.markdown(formatted_content)
         
         # Then display plots below the text (if any)
         if plot_paths:
@@ -590,6 +615,14 @@ async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
         return
     
     try:
+        # Show Assistant separator at the start
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin: 1rem 0 0.5rem 0;">
+            <span style="margin-right: 0.5rem;">🤖</span>
+            <strong>Assistant</strong>
+        </div>
+        """, unsafe_allow_html=True)
+        
         # Create containers for streaming output
         response_container = st.empty()
         current_response = ""
@@ -634,21 +667,14 @@ async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
                         delta_content = event_data["delta"]["content"]
                         current_response += delta_content
                         
-                        # Update display with plain text streaming content
+                        # Update display with properly formatted streaming content
                         with response_container:
                             if current_response.strip():
-                                st.markdown(f"""
-                                <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
-                                    <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                                        <span style="margin-right: 0.5rem;">🤖</span>
-                                        <strong>Assistant</strong>
-                                        <span style="margin-left: auto; color: #64748b; font-size: 0.8rem;">
-                                            <div class="streaming-dot"></div>Processing...
-                                        </span>
-                                    </div>
-                                    <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{format_agent_content(current_response.strip())}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                # Format the content properly for streaming display
+                                formatted_streaming_content = format_agent_content(current_response.strip())
+                                
+                                # Display content using Streamlit's markdown for proper table rendering
+                                st.markdown(formatted_streaming_content)
                 
                 elif event_type == "end_of_agent":
                     agent_name = event_data.get("agent_name", "unknown")
@@ -673,9 +699,11 @@ async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
                 "content": final_message
             })
             
-            # Final display without streaming indicator
+            # Final display without streaming indicator - just update the content
             with response_container:
-                display_message({"role": "assistant", "content": final_message})
+                if final_message.strip():
+                    formatted_final_content = format_agent_content(final_message.strip())
+                    st.markdown(formatted_final_content)
             
             st.success("✅ Response completed!")
         else:
@@ -713,6 +741,14 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
             st.error(f"API Error: {response.status_code} - {response.text}")
             return
         
+        # Show Assistant separator at the start
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin: 1rem 0 0.5rem 0;">
+            <span style="margin-right: 0.5rem;">🤖</span>
+            <strong>Assistant</strong>
+        </div>
+        """, unsafe_allow_html=True)
+        
         # Create containers for streaming output
         response_container = st.empty()
         current_response = ""
@@ -733,22 +769,14 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
                                 delta_content = event_data["delta"]["content"]
                                 current_response += delta_content
                                 
-                                # Update display with plain text content as it streams
+                                # Update display with properly formatted content as it streams
                                 with response_container:
                                     if current_response.strip():
-                                        # Show the streaming content as plain text
-                                        st.markdown(f"""
-                                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
-                                            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                                                <span style="margin-right: 0.5rem;">🤖</span>
-                                                <strong>Assistant</strong>
-                                                <span style="margin-left: auto; color: #64748b; font-size: 0.8rem;">
-                                                    <div class="streaming-dot"></div>Thinking...
-                                                </span>
-                                            </div>
-                                            <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{format_agent_content(current_response.strip())}</div>
-                                        </div>
-                                        """, unsafe_allow_html=True)
+                                        # Format the content properly for streaming display
+                                        formatted_streaming_content = format_agent_content(current_response.strip())
+                                        
+                                        # Display content using Streamlit's markdown for proper table rendering
+                                        st.markdown(formatted_streaming_content)
                         
                         elif event.event == "error":
                             st.error(f"Error: {event_data}")
@@ -772,9 +800,11 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
                 "content": current_response.strip()
             })
             
-            # Final display without streaming indicator
+            # Final display without streaming indicator - just update the content
             with response_container:
-                display_message({"role": "assistant", "content": current_response.strip()})
+                if current_response.strip():
+                    formatted_final_content = format_agent_content(current_response.strip())
+                    st.markdown(formatted_final_content)
             
             st.success("✅ Response completed!")
         else:
@@ -1008,6 +1038,9 @@ def main():
             # Add user message to history
             user_message = {"role": "user", "content": user_input.strip()}
             st.session_state.messages.append(user_message)
+            
+            # Display the user message immediately
+            display_message(user_message, is_user=True)
             
             # Configuration for execution
             config = {
