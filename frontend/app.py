@@ -377,13 +377,7 @@ if "event_log" not in st.session_state:
 if "current_thought_process" not in st.session_state:
     st.session_state.current_thought_process = ""
 
-def display_header():
-    """Display the main header"""
-    st.markdown("""
-    <div style="text-align: center; padding: 2rem 1rem; margin-bottom: 2rem;">
-        <h1 style="color: #1e3a8a; font-weight: 600; margin: 0;">DataManus</h1>
-    </div>
-    """, unsafe_allow_html=True)
+
 
 def extract_thought_process(content: str) -> str:
     """Extract thought process from planner content for sidebar display"""
@@ -820,7 +814,6 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
 
 def main():
     """Main application function"""
-    display_header()
     
     # Clean up old plots periodically
     if PLOT_UTILS_AVAILABLE:
