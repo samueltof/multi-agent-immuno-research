@@ -117,17 +117,27 @@ def biomedical_researcher_graph_node(state: State) -> Command[Literal["superviso
         message_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
     
     logger.debug(f"Biomedical researcher agent response: {message_content}")
+    
+    # Extract biomedical research result if available
+    biomedical_result = result.get('biomedical_research_result')
+    
+    update_data = {
+        "messages": [
+            HumanMessage(
+                content=RESPONSE_FORMAT.format(
+                    "biomedical_researcher", message_content
+                ),
+                name="biomedical_researcher",
+            )
+        ]
+    }
+    
+    # Add biomedical research result to state if available
+    if biomedical_result:
+        update_data["biomedical_research_result"] = biomedical_result
+    
     return Command(
-        update={
-            "messages": [
-                HumanMessage(
-                    content=RESPONSE_FORMAT.format(
-                        "biomedical_researcher", message_content
-                    ),
-                    name="biomedical_researcher",
-                )
-            ]
-        },
+        update=update_data,
         goto="supervisor",
     )
 

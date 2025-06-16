@@ -86,17 +86,31 @@ def biomedical_researcher_agent(state):
         
         # Convert the result to LangGraph compatible format
         messages = result.get("messages", [])
+        biomedical_result = result.get("biomedical_research_result")
+        
         if messages:
             # Get the last message which should be the research summary
             last_message = messages[-1]
-            return {
+            response = {
                 "messages": [{"role": "assistant", "content": last_message}]
             }
+            
+            # Include biomedical research result if available
+            if biomedical_result:
+                response["biomedical_research_result"] = biomedical_result
+                
+            return response
         else:
             # Fallback if no messages in result
-            return {
+            response = {
                 "messages": [{"role": "assistant", "content": "Biomedical research completed successfully."}]
             }
+            
+            # Include biomedical research result if available
+            if biomedical_result:
+                response["biomedical_research_result"] = biomedical_result
+                
+            return response
     finally:
         loop.close()
 

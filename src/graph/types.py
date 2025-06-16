@@ -1,4 +1,4 @@
-from typing import Literal, Union
+from typing import Literal, Union, Optional, Any
 from typing_extensions import TypedDict
 from langgraph.graph import MessagesState
 
@@ -25,3 +25,6 @@ class State(MessagesState):
     full_plan: str
     deep_thinking_mode: bool
     search_before_planning: bool
+    
+    # Agent-specific results
+    biomedical_research_result: Optional[Any]  # Stores detailed biomedical research results
