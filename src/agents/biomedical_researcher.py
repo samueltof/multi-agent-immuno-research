@@ -214,21 +214,62 @@ def create_biomedical_researcher_agent():
         5. Highlight any limitations or gaps in the available data
         6. Suggest follow-up research directions when appropriate
 
+        IMPORTANT: Your summary should be a COMPLETE, SELF-CONTAINED report that includes:
+        - A clear summary of the research findings
+        - Specific key findings from the literature
+        - Complete bibliographic citations formatted as: "Author et al. (Year). Title. Journal. PMID: XXXXX"
+        - Actionable recommendations
+        - Your confidence assessment
+
+        The reporter agent will use your summary directly, so ensure it includes all necessary information including properly formatted citations. Do NOT rely on separate citation formatting - include everything in your summary.
+
+        IMPORTANT CITATION FORMATTING:
+        When you find research articles through the MCP tools, extract the complete citation information:
+        - From PubMed results: Extract title, authors, journal, publication date, and PMID
+        - From BioRxiv results: Extract title, authors, DOI, and submission date
+        - From Clinical Trials: Extract study title, NCT number, phase, and status
+        - From other databases: Extract available identifiers and metadata
+        
+        Format sources as detailed objects with ALL available information:
+        - title: Full article/study title
+        - authors: Author list or "Authors et al." format
+        - journal: Journal name or database source
+        - year: Publication year
+        - pmid: PubMed ID (when available)
+        - doi: DOI (when available)
+        - url: URL or database identifier
+        - database: Source database name
+
         IMPORTANT: Always respond with valid JSON structure containing:
-        - summary: A string summarizing the research findings
+        - summary: A COMPLETE, SELF-CONTAINED research report with embedded citations
         - key_findings: A list of strings with key insights
-        - sources: A list of objects with source information (each with title, pmid/url keys)
+        - sources: A list of objects with COMPLETE source information as detailed above
         - recommendations: A list of strings with actionable recommendations
         - confidence_level: A float between 0.0 and 1.0 indicating confidence
 
         Example response format:
         {
-            "summary": "Cancer immunogenomics focuses on...",
+            "summary": "Recent research on cancer immunogenomics has shown significant advances. Smith et al. (2024) demonstrated improved CAR-T cell efficacy (PMID: 12345678), while Johnson et al. (2024) reported novel biomarkers for patient selection (PMID: 87654321). These findings suggest...",
             "key_findings": ["Finding 1", "Finding 2"],
-            "sources": [{"title": "Paper Title", "pmid": "12345"}],
+            "sources": [
+                {
+                    "title": "Full article title here",
+                    "authors": "Smith JA, Johnson B, et al.",
+                    "journal": "Nature Medicine",
+                    "year": "2024",
+                    "pmid": "12345678",
+                    "database": "PubMed"
+                }
+            ],
             "recommendations": ["Recommendation 1"],
             "confidence_level": 0.8
         }
+        
+        CRITICAL: 
+        1. When using MCP tools, carefully parse the returned information to extract ALL citation details
+        2. Include complete citations WITHIN your summary text, not just in the sources array
+        3. Your summary should be comprehensive enough to be used directly by the reporter
+        4. Do not use placeholder citations - use the actual data returned by the tools
         """,
         instructions="""Focus on providing comprehensive, evidence-based biomedical research insights. 
         Use the available biomedical database tools to gather information from multiple sources. 

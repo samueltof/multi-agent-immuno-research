@@ -27,44 +27,9 @@ def apply_prompt_template(prompt_name: str, state: AgentState) -> list:
     if prompt_name == "reporter":
         biomedical_result = state.get("biomedical_research_result")
         if biomedical_result:
-            try:
-                # Handle both object and dictionary formats
-                if hasattr(biomedical_result, 'summary'):
-                    # Object format
-                    summary = biomedical_result.summary
-                    key_findings = biomedical_result.key_findings
-                    sources = biomedical_result.sources
-                    recommendations = biomedical_result.recommendations
-                    confidence_level = biomedical_result.confidence_level
-                else:
-                    # Dictionary format
-                    summary = biomedical_result.get('summary', 'No summary available')
-                    key_findings = biomedical_result.get('key_findings', [])
-                    sources = biomedical_result.get('sources', [])
-                    recommendations = biomedical_result.get('recommendations', [])
-                    confidence_level = biomedical_result.get('confidence_level', 0.0)
-                
-                # Format the biomedical research result for the reporter
-                biomedical_data = f"""
-**Biomedical Research Results Available:**
-
-**Summary:** {summary}
-
-**Key Findings:**
-{chr(10).join(f"• {finding}" for finding in key_findings) if key_findings else "• No key findings available"}
-
-**Sources:**
-{chr(10).join(f"• {source}" for source in sources) if sources else "• No sources available"}
-
-**Recommendations:**
-{chr(10).join(f"• {rec}" for rec in recommendations) if recommendations else "• No recommendations available"}
-
-**Confidence Level:** {confidence_level:.2f}
-"""
-                template_vars["biomedical_research_result"] = biomedical_data
-            except Exception as e:
-                # Fallback if there's an error parsing the biomedical result
-                template_vars["biomedical_research_result"] = f"Biomedical research data available but could not be parsed: {str(e)}"
+            # Simply indicate that biomedical research data is available
+            # The biomedical researcher should handle all formatting in its response
+            template_vars["biomedical_research_result"] = "Biomedical research data is available and has been provided by the biomedical researcher with complete citations and sources."
         else:
             template_vars["biomedical_research_result"] = "No biomedical research results available."
     
