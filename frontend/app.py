@@ -489,25 +489,73 @@ def display_message(message: Dict[str, str], is_user: bool = False):
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Check for plots in the content and display them
+        # First, prepare the content and check for plots
+        plot_paths = []
+        formatted_content = ""
+        
         if PLOT_UTILS_AVAILABLE:
-            plot_paths = extract_plot_paths_from_content(content)
-            if plot_paths:
+            try:
+                plot_paths = extract_plot_paths_from_content(content)
+                if plot_paths:
+                    # Clean the content manually to avoid duplicate plot display
+                    cleaned_content = content
+                    
+                    # Remove markdown image references and replace with descriptive text
+                    import re
+                    cleaned_content = re.sub(r'!\[.*?\]\([^)]+\.png\)', '', cleaned_content)
+                    
+                    # Replace plot reference phrases with cleaner versions
+                    cleaned_content = re.sub(r'You can view the generated plot in the following file:\s*', 'The generated plot is displayed below:\n\n', cleaned_content)
+                    cleaned_content = re.sub(r'You can find the generated plot at:\s*', 'The generated plot is displayed below:\n\n', cleaned_content)
+                    cleaned_content = re.sub(r'You can view the plot in the image below:\s*', 'The generated plot is displayed below:\n\n', cleaned_content)
+                    cleaned_content = re.sub(r'You can view and download the plot using the link below:\s*', 'The generated plot is displayed below:\n\n', cleaned_content)
+                    
+                    # Clean up extra newlines
+                    cleaned_content = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_content)
+                    cleaned_content = cleaned_content.strip()
+                    
+                    # Add a note about the plot being displayed below if it's not already mentioned
+                    if cleaned_content and not any(phrase in cleaned_content.lower() for phrase in ['plot is displayed below', 'plot shown below', 'visualization below']):
+                        cleaned_content += '\n\nThe generated plot is displayed below:'
+                    
+                    formatted_content = format_agent_content(cleaned_content)
+                else:
+                    formatted_content = format_agent_content(content)
+            except Exception as e:
+                st.error(f"Error processing plots: {e}")
+                formatted_content = format_agent_content(content)
+        else:
+            formatted_content = format_agent_content(content)
+        
+        # Display the text content first
+        if formatted_content.strip():  # Only show text if there's content after cleaning
+            st.markdown(f"""
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="margin-right: 0.5rem;">🤖</span>
+                    <strong>Assistant</strong>
+                </div>
+                <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{formatted_content}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Then display plots below the text (if any)
+        if plot_paths:
+            try:
                 # Display plots using Streamlit's image display
-                st.markdown("### 📊 Generated Plots")
+                st.markdown("### Plots")
                 
                 # Display plots in columns if multiple
                 if len(plot_paths) == 1:
-                    st.image(plot_paths[0], caption=f"Generated Plot", use_column_width=True)
+                    st.image(plot_paths[0], caption=f"Generated Plot", use_container_width=True)
                 else:
                     cols = st.columns(min(len(plot_paths), 3))
                     for idx, plot_path in enumerate(plot_paths):
                         if os.path.exists(plot_path):
                             with cols[idx % 3]:
-                                st.image(plot_path, caption=f"Plot {idx + 1}", use_column_width=True)
+                                st.image(plot_path, caption=f"Plot {idx + 1}", use_container_width=True)
                 
-                # Add download buttons
-                st.markdown("### 📥 Download Plots")
+                # Add download buttons without title
                 for plot_path in plot_paths:
                     if os.path.exists(plot_path):
                         from pathlib import Path
@@ -524,41 +572,8 @@ def display_message(message: Dict[str, str], is_user: bool = False):
                                 )
                         except Exception as e:
                             st.error(f"Error creating download button for {plot_name}: {e}")
-                
-                # Clean the content to remove plot references
-                cleaned_content = content
-                for plot_path in plot_paths:
-                    patterns_to_remove = [
-                        f"PLOT_SAVED: {plot_path}",
-                        f"Plot saved as '{plot_path}'",
-                        f"Plot saved as \"{plot_path}\"",
-                        f"- {plot_path}",
-                        f"Plots generated:\n- {plot_path}",
-                        f"\n\nPlots generated:\n- {plot_path}",
-                    ]
-                    for pattern in patterns_to_remove:
-                        cleaned_content = cleaned_content.replace(pattern, "")
-                
-                # Clean up extra newlines
-                import re
-                cleaned_content = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_content)
-                formatted_content = format_agent_content(cleaned_content.strip())
-            else:
-                formatted_content = format_agent_content(content)
-        else:
-            formatted_content = format_agent_content(content)
-        
-        # Assistant messages in light background with plain text
-        if formatted_content.strip():  # Only show text if there's content after cleaning
-            st.markdown(f"""
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
-                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="margin-right: 0.5rem;">🤖</span>
-                    <strong>Assistant</strong>
-                </div>
-                <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{formatted_content}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error displaying plots: {e}")
 
 def get_server_status(api_url: str) -> bool:
     """Check if the API server is running"""

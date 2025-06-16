@@ -13,6 +13,8 @@ def extract_plot_paths_from_content(content: str) -> List[str]:
     patterns = [
         r'PLOT_SAVED: (.+\.png)',
         r'Plot saved as [\'"](.+\.png)[\'"]',
+        r'!\[.*?\]\((outputs/plots/[^)]+\.png)\)',  # Markdown image format
+        r'!\[.*?\]\(([^)]+\.png)\)',  # General markdown image format
         r'outputs/plots/(.+\.png)',
         r'plots/(.+\.png)',  # Legacy support
         r'- (.+\.png)',  # From the modified python_repl output
@@ -23,8 +25,18 @@ def extract_plot_paths_from_content(content: str) -> List[str]:
         for match in matches:
             # Clean up the path
             plot_path = match.strip()
-            if os.path.exists(plot_path):
-                plot_paths.append(plot_path)
+            
+            # Handle different working directory contexts
+            possible_paths = [
+                plot_path,  # Original path
+                os.path.join('..', plot_path),  # Parent directory
+                os.path.join('..', '..', plot_path),  # Grandparent directory
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path) and path not in plot_paths:
+                    plot_paths.append(path)
+                    break
     
     return plot_paths
 
@@ -81,6 +93,13 @@ def display_plots_in_message(content: str) -> str:
             for pattern in patterns_to_remove:
                 cleaned_content = cleaned_content.replace(pattern, "")
         
+        # Remove markdown image references
+        cleaned_content = re.sub(r'!\[.*?\]\([^)]+\.png\)', '', cleaned_content)
+        
+        # Remove common plot introduction text
+        cleaned_content = re.sub(r'You can view the generated plot in the following file:\s*', '', cleaned_content)
+        cleaned_content = re.sub(r'You can find the generated plot at:\s*', '', cleaned_content)
+        
         # Clean up extra newlines
         cleaned_content = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_content)
         cleaned_content = cleaned_content.strip()
@@ -136,8 +155,20 @@ def display_plots_with_html(plot_paths: List[str]) -> str:
 
 def cleanup_old_plots(max_plots: int = 100) -> None:
     """Clean up old plot files to prevent disk space issues"""
-    plots_dir = Path("outputs/plots")
-    if not plots_dir.exists():
+    # Try different possible paths for the plots directory
+    possible_dirs = [
+        Path("outputs/plots"),
+        Path("../outputs/plots"),
+        Path("../../outputs/plots"),
+    ]
+    
+    plots_dir = None
+    for dir_path in possible_dirs:
+        if dir_path.exists():
+            plots_dir = dir_path
+            break
+    
+    if plots_dir is None:
         return
     
     # Get all plot files sorted by creation time
