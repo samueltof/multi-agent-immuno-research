@@ -20,6 +20,20 @@ except ImportError:
     DIRECT_MODE_AVAILABLE = False
     print("Warning: Direct workflow execution not available. Only API mode will work.")
 
+# Import plot utilities
+try:
+    from plot_utils import (
+        extract_plot_paths_from_content, 
+        display_plots_in_message,
+        display_plots_with_html,
+        create_download_button_for_plots,
+        cleanup_old_plots
+    )
+    PLOT_UTILS_AVAILABLE = True
+except ImportError:
+    PLOT_UTILS_AVAILABLE = False
+    print("Warning: Plot utilities not available. Plots will not be displayed.")
+
 # Page configuration
 st.set_page_config(
     page_title="DataManus",
@@ -459,7 +473,7 @@ def format_agent_content(content: str) -> str:
         return content
 
 def display_message(message: Dict[str, str], is_user: bool = False):
-    """Display a chat message with plain text styling"""
+    """Display a chat message with plain text styling and plot support"""
     role = message.get("role", "assistant")
     content = message.get("content", "")
     
@@ -475,19 +489,76 @@ def display_message(message: Dict[str, str], is_user: bool = False):
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Format assistant content as plain text
-        formatted_content = format_agent_content(content)
+        # Check for plots in the content and display them
+        if PLOT_UTILS_AVAILABLE:
+            plot_paths = extract_plot_paths_from_content(content)
+            if plot_paths:
+                # Display plots using Streamlit's image display
+                st.markdown("### 📊 Generated Plots")
+                
+                # Display plots in columns if multiple
+                if len(plot_paths) == 1:
+                    st.image(plot_paths[0], caption=f"Generated Plot", use_column_width=True)
+                else:
+                    cols = st.columns(min(len(plot_paths), 3))
+                    for idx, plot_path in enumerate(plot_paths):
+                        if os.path.exists(plot_path):
+                            with cols[idx % 3]:
+                                st.image(plot_path, caption=f"Plot {idx + 1}", use_column_width=True)
+                
+                # Add download buttons
+                st.markdown("### 📥 Download Plots")
+                for plot_path in plot_paths:
+                    if os.path.exists(plot_path):
+                        from pathlib import Path
+                        plot_name = Path(plot_path).name
+                        try:
+                            with open(plot_path, "rb") as file:
+                                st.download_button(
+                                    label=f"📥 Download {plot_name}",
+                                    data=file.read(),
+                                    file_name=plot_name,
+                                    mime="image/png",
+                                    key=f"download_{plot_name}_{hash(content)}",
+                                    use_container_width=False
+                                )
+                        except Exception as e:
+                            st.error(f"Error creating download button for {plot_name}: {e}")
+                
+                # Clean the content to remove plot references
+                cleaned_content = content
+                for plot_path in plot_paths:
+                    patterns_to_remove = [
+                        f"PLOT_SAVED: {plot_path}",
+                        f"Plot saved as '{plot_path}'",
+                        f"Plot saved as \"{plot_path}\"",
+                        f"- {plot_path}",
+                        f"Plots generated:\n- {plot_path}",
+                        f"\n\nPlots generated:\n- {plot_path}",
+                    ]
+                    for pattern in patterns_to_remove:
+                        cleaned_content = cleaned_content.replace(pattern, "")
+                
+                # Clean up extra newlines
+                import re
+                cleaned_content = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_content)
+                formatted_content = format_agent_content(cleaned_content.strip())
+            else:
+                formatted_content = format_agent_content(content)
+        else:
+            formatted_content = format_agent_content(content)
         
         # Assistant messages in light background with plain text
-        st.markdown(f"""
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="margin-right: 0.5rem;">🤖</span>
-                <strong>Assistant</strong>
+        if formatted_content.strip():  # Only show text if there's content after cleaning
+            st.markdown(f"""
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 10px; margin: 1rem 0 1rem 3rem;">
+                <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="margin-right: 0.5rem;">🤖</span>
+                    <strong>Assistant</strong>
+                </div>
+                <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{formatted_content}</div>
             </div>
-            <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.4;">{formatted_content}</div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
 
 def get_server_status(api_url: str) -> bool:
     """Check if the API server is running"""
@@ -705,6 +776,10 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
 def main():
     """Main application function"""
     display_header()
+    
+    # Clean up old plots periodically
+    if PLOT_UTILS_AVAILABLE:
+        cleanup_old_plots(max_plots=50)
     
     # Sidebar configuration
     with st.sidebar:
