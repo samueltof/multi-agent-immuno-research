@@ -12,6 +12,7 @@ class Router(TypedDict):
     """Worker to route to next. If no workers needed, route to FINISH."""
 
     next: Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["biomedical_researcher"], Literal["FINISH"]]
+    reasoning: Optional[str]  # Optional reasoning for the routing decision
 
 
 class State(MessagesState):

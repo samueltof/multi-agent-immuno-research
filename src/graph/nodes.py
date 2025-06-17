@@ -152,8 +152,11 @@ def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Litera
         .invoke(messages)
     )
     goto = response["next"]
+    reasoning = response.get("reasoning", "No reasoning provided")
+    
     logger.debug(f"Current state messages: {state['messages']}")
     logger.debug(f"Supervisor response: {response}")
+    logger.info(f"Supervisor reasoning: {reasoning}")
 
     if goto == "FINISH":
         goto = "__end__"
