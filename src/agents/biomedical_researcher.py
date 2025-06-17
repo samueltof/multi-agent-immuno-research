@@ -19,7 +19,6 @@ from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
 
 from ..config.agents import AGENT_LLM_MAP
-from ..agents.llm import get_llm_by_type
 from ..config import (
     REASONING_API_KEY,
     REASONING_BASE_URL,
@@ -50,32 +49,33 @@ class BiomedicalResearchOutput(BaseModel):
 
 
 def get_biomedical_model():
-    """Get the appropriate model for the biomedical researcher agent."""
-    # Use the reasoning model type for biomedical research
-    base_llm = get_llm_by_type(AGENT_LLM_MAP["biomedical_researcher"])
-    
-    # Extract model name from the LangChain LLM
-    if hasattr(base_llm, 'model_name'):
-        model_name = base_llm.model_name
-    elif hasattr(base_llm, 'model'):
-        model_name = base_llm.model
-    else:
-        model_name = "gpt-4o"  # fallback
-    
-    # Use the same API configuration as the rest of the application
+    """Get the appropriate PydanticAI model for the biomedical researcher agent."""
+    # Get configuration directly without creating LangChain LLM first
     agent_type = AGENT_LLM_MAP["biomedical_researcher"]
+    
     if agent_type == "reasoning":
+        from ..config import REASONING_MODEL, REASONING_API_KEY, REASONING_BASE_URL
+        model_name = REASONING_MODEL
         api_key = REASONING_API_KEY
         base_url = REASONING_BASE_URL
-    else:
+    elif agent_type == "basic":
+        from ..config import BASIC_MODEL, BASIC_API_KEY, BASIC_BASE_URL
+        model_name = BASIC_MODEL
         api_key = BASIC_API_KEY
         base_url = BASIC_BASE_URL
+    else:  # vision
+        from ..config import VL_MODEL, VL_API_KEY, VL_BASE_URL
+        model_name = VL_MODEL
+        api_key = VL_API_KEY
+        base_url = VL_BASE_URL
     
     # Fallback to environment variables if config is not set
     if not api_key:
         api_key = os.getenv('OPENAI_API_KEY') or os.getenv('LLM_API_KEY', 'no-api-key-provided')
     if not base_url:
         base_url = os.getenv('BASE_URL', 'https://api.openai.com/v1')
+    if not model_name:
+        model_name = "gpt-4o"  # fallback
     
     # Create PydanticAI model
     if 'claude' in model_name.lower():
