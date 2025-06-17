@@ -32,6 +32,7 @@ dependencies = [
     "openai>=1.84.0",
     "matplotlib>=3.10.3",
     "langchain-sandbox>=0.0.6",
+    "mcp>=1.9.4",
 ]
 
 [project.optional-dependencies]
@@ -64,3 +65,10 @@ extend-exclude = '''
 # in the root of the project.
 ^/build/
 '''
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.0.0",
+]

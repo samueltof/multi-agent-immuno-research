@@ -19,7 +19,7 @@ from .llm import get_llm_by_type
 from src.config.agents import AGENT_LLM_MAP
 from .data_team import create_data_team_graph
 from .biomedical_researcher import (
-    biomedical_researcher_wrapper
+    biomedical_researcher_node
 )
 
 # Create agents using configured LLM types
@@ -77,7 +77,6 @@ def biomedical_researcher_agent(state):
     This integrates the PydanticAI biomedical researcher with LangGraph.
     """
     import asyncio
-    from .biomedical_researcher import biomedical_researcher_node
     
     # Run the biomedical researcher node asynchronously
     loop = asyncio.new_event_loop()

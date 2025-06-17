@@ -17,6 +17,35 @@ def get_prompt_template(prompt_name: str) -> str:
     return template
 
 
+def get_processed_prompt(prompt_name: str, template_vars: Dict[str, Any] = None) -> str:
+    """Get processed prompt text for use in PydanticAI agents."""
+    if template_vars is None:
+        template_vars = {}
+    
+    # Add common template variables
+    full_template_vars = {
+        "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
+        "research_focus": "",
+        "user_context": "",
+        "time_range": "",
+        "preferred_databases": "",
+        **template_vars
+    }
+    
+    # Handle empty values by replacing with empty string
+    for key, value in full_template_vars.items():
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            full_template_vars[key] = ""
+    
+    template = get_prompt_template(prompt_name)
+    prompt = PromptTemplate(
+        input_variables=list(full_template_vars.keys()),
+        template=template,
+    ).format(**full_template_vars)
+    
+    return prompt
+
+
 def get_workflow_prompt_template(agent_name: str, workflow_step: str) -> str:
     """Load workflow-specific prompts from agent subdirectories."""
     template_path = os.path.join(
