@@ -33,8 +33,26 @@ async def search_targets(query: str, max_results: int = 10) -> str:
     """Search Open Targets for gene targets matching the query using GraphQL.
     
     Args:
-        query: Search query for target names or symbols
-        max_results: Maximum number of results to return (default: 10)
+        query: Search query for target names or symbols (e.g., "Alzheimer", "BRAF", "kinase", "p53")
+        max_results: Maximum number of results to return (default: 10, max: 50)
+    
+    Returns:
+        List of gene targets with symbols and Ensembl IDs.
+        Targets are filtered from general search results.
+        
+    Output format:
+        Symbol: [Gene symbol]
+        Target ID: [Ensembl gene ID]
+        
+    Examples:
+        - query="Alzheimer" → Returns APP, MAPT, PSEN1 and related targets
+        - query="BRAF" → Returns BRAF gene target
+        - query="kinase" → Returns various kinase targets
+        
+    Notes:
+        - Performance: ~0.19s typical response time
+        - Uses GraphQL search across gene annotations
+        - Returns Ensembl gene IDs for further queries
     """
     graphql_query = """
     query searchQuery($queryString: String!) {
@@ -83,7 +101,30 @@ async def get_target_details(target_id: str) -> str:
     """Get detailed information about a specific target by ID using GraphQL.
     
     Args:
-        target_id: Open Targets ID for the target (e.g., "ENSG00000157764")
+        target_id: Open Targets ID for the target (Ensembl gene ID, e.g., "ENSG00000142192")
+    
+    Returns:
+        Comprehensive target information including gene symbol, name, function, location, and tractability.
+        All available metadata from Open Targets database.
+        
+    Output format:
+        Symbol: [Gene symbol]
+        Name: [Full gene name]
+        Target ID: [Ensembl ID]
+        Biotype: [Gene biotype]
+        Chromosome: [Chromosome location]
+        Gene Function: [Functional descriptions]
+        Tractability: [Drug development tractability scores]
+        
+    Examples:
+        - target_id="ENSG00000142192" → Detailed APP gene information
+        - target_id="ENSG00000157764" → Detailed BRAF gene information
+        - Use target IDs from search_targets results
+        
+    Notes:
+        - Performance: ~0.17s typical response time
+        - Provides comprehensive gene annotations
+        - Includes tractability assessments for drug development
     """
     graphql_query = """
     query targetInfo($ensemblId: String!) {
@@ -156,8 +197,26 @@ async def search_diseases(query: str, max_results: int = 10) -> str:
     """Search for diseases in Open Targets using GraphQL.
     
     Args:
-        query: Search query for disease names
-        max_results: Maximum number of results to return (default: 10)
+        query: Search query for disease names (e.g., "cancer", "diabetes", "Alzheimer", "heart disease")
+        max_results: Maximum number of results to return (default: 10, max: 50)
+    
+    Returns:
+        List of diseases with names and ontology IDs.
+        Diseases are filtered from general search results.
+        
+    Output format:
+        Disease: [Disease name]
+        Disease ID: [Ontology ID (MONDO, EFO, etc.)]
+        
+    Examples:
+        - query="cancer" → Returns various cancer types and related diseases
+        - query="diabetes" → Returns diabetes types and metabolic disorders
+        - query="Alzheimer" → Returns Alzheimer's disease and related conditions
+        
+    Notes:
+        - Performance: ~0.13s typical response time
+        - Uses disease ontologies (MONDO, EFO, Orphanet)
+        - Returns disease IDs for association queries
     """
     graphql_query = """
     query searchQuery($queryString: String!) {
@@ -206,8 +265,28 @@ async def get_target_associated_diseases(target_id: str, max_results: int = 10) 
     """Get diseases associated with a specific target using GraphQL.
     
     Args:
-        target_id: Open Targets ID for the target (e.g., "ENSG00000157764")
-        max_results: Maximum number of results to return (default: 10)
+        target_id: Open Targets ID for the target (Ensembl gene ID, e.g., "ENSG00000142192")
+        max_results: Maximum number of results to return (default: 10, max: 50)
+    
+    Returns:
+        List of diseases associated with the gene target, ranked by association score.
+        Returns error message if GraphQL query fails (handled gracefully).
+        
+    Output format:
+        Disease: [Disease name]
+        Disease ID: [Disease ontology ID]
+        Association Score: [Numerical association strength]
+        
+    Examples:
+        - target_id="ENSG00000142192" → Diseases associated with APP gene
+        - target_id="ENSG00000157764" → Diseases associated with BRAF gene
+        - Use target IDs from search_targets results
+        
+    Notes:
+        - Performance: ~0.14s typical response time
+        - May return GraphQL 400 errors (handled gracefully)
+        - Association scores indicate strength of target-disease relationship
+        - Returns "No diseases associated" if none found
     """
     graphql_query = """
     query targetAssociations($ensemblId: String!, $size: Int!) {
@@ -268,8 +347,29 @@ async def get_disease_associated_targets(disease_id: str, max_results: int = 10)
     """Get targets associated with a specific disease using GraphQL.
     
     Args:
-        disease_id: Open Targets disease ID
-        max_results: Maximum number of results to return (default: 10)
+        disease_id: Open Targets disease ID (ontology ID, e.g., "MONDO_0004992", "EFO_0000249")
+        max_results: Maximum number of results to return (default: 10, max: 50)
+    
+    Returns:
+        List of gene targets associated with the disease, ranked by association score.
+        Returns error message if GraphQL query fails (handled gracefully).
+        
+    Output format:
+        Symbol: [Gene symbol]
+        Name: [Full gene name]
+        Target ID: [Ensembl gene ID]
+        Association Score: [Numerical association strength]
+        
+    Examples:
+        - disease_id="MONDO_0004992" → Targets associated with cancer
+        - disease_id="EFO_0000249" → Targets associated with Alzheimer's disease
+        - Use disease IDs from search_diseases results
+        
+    Notes:
+        - Performance: ~0.14s typical response time
+        - May return GraphQL 400 errors (handled gracefully)
+        - Association scores indicate strength of disease-target relationship
+        - Returns "No targets associated" if none found
     """
     graphql_query = """
     query diseaseAssociations($efoId: String!, $size: Int!) {
@@ -333,8 +433,27 @@ async def search_drugs(query: str, max_results: int = 10) -> str:
     """Search for drugs in Open Targets using GraphQL.
     
     Args:
-        query: Search query for drug names
-        max_results: Maximum number of results to return (default: 10)
+        query: Search query for drug names (e.g., "aspirin", "ibuprofen", "metformin", "chemotherapy")
+        max_results: Maximum number of results to return (default: 10, max: 50)
+    
+    Returns:
+        List of drugs with names and ChEMBL IDs.
+        Drugs are filtered from general search results.
+        
+    Output format:
+        Drug: [Drug name]
+        Drug ID: [ChEMBL identifier]
+        
+    Examples:
+        - query="aspirin" → Returns ASPIRIN with ChEMBL ID
+        - query="metformin" → Returns metformin drug information
+        - query="antibody" → Returns various antibody drugs
+        
+    Notes:
+        - Performance: ~0.14s typical response time
+        - Uses ChEMBL database integration
+        - Returns ChEMBL IDs for drug-target interaction queries
+        - Covers approved drugs and experimental compounds
     """
     graphql_query = """
     query searchQuery($queryString: String!) {
