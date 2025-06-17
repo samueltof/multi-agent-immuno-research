@@ -329,8 +329,14 @@ def check_for_errors_after_execution(state: DataTeamState) -> str:
         return "handle_error"
     return "continue_to_format"
 
-def create_data_team_graph(llm_client: Any):
+def create_data_team_graph(config=None):
     """Creates and compiles the LangGraph StateGraph for the data team."""
+    from ..config.agents import AGENT_LLM_MAP
+    from ..agents.llm import get_llm_by_type
+    
+    # Get the LLM client for the data team
+    llm_client = get_llm_by_type(AGENT_LLM_MAP["data_analyst"])
+    
     workflow = StateGraph(DataTeamState)
 
     # Create the ReAct agent for SQL generation with database tools
