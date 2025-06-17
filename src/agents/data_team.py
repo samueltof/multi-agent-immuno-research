@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from src.tools.database import get_database_schema, execute_sql_query, get_random_subsamples
+from src.prompts import apply_workflow_prompt_template
 
 logger = logging.getLogger(__name__)
 
@@ -49,69 +50,14 @@ class DataTeamState(MessagesState):
     sql_generation_retries: int = 0
     provided_schema_text: Optional[str] = None
 
-# Initial prompt for the data analysis ReAct agent
-REACT_AGENT_INITIAL_PROMPT = """
-You are a data analyst expert tasked with generating SQLite SQL queries based on user requests OR providing sample data when asked.
-You have access to tools to get random data samples (`get_random_subsamples`).
-
-**IMPORTANT: The database schema has been provided to you below. Use the EXACT table and column names from this schema!**
-
-Your goal is to:
-1. Analyze the user's query: 
-<user_query>    
-{query}
-</user_query>
-2. **If the user is asking for sample data:** Use the `get_random_subsamples` tool with appropriate table and column specifications.
-3. **If the user is asking a question that requires data from the database:**
-    
-    **STEP 1:** Analyze the provided schema below to identify relevant tables and columns.
-    **STEP 2:** Generate SQLite SQL query using ONLY the table and column names from the provided schema.
-    **STEP 3:** Respond ONLY with the final SQL query itself, without any introductory text, explanations, or markdown formatting like ```sql.
-    
-    **CRITICAL: Use ONLY the table and column names provided in the schema below!**
-
-Query guidelines:
-- Do not under any circumstance use SELECT * in your query.
-- Use the relevant columns in the SELECT statement
-- Use appropriate JOIN conditions
-- Include WHERE clauses to filter relevant data
-- Order results meaningfully when appropriate
-- Handle NULL values appropriately (SKIP ALL ROWS WHERE ANY COLUMN IS NULL or "N/A" or "")
-- Use UNION ALL when using multiple datasets
-
-{retry_feedback}
-"""
+# Note: ReAct agent prompt is now loaded from src/prompts/data_analyst/react_sql_generator.md
 
 # SQL Validation Model
 class SQLValidationResult(BaseModel):
     status: Literal["valid", "invalid", "error"] = Field(description="The validation status of the SQL query.")
     feedback: str = Field(description="Detailed feedback on the validation, including reasons for invalidity or confirmation of validity.")
 
-# SQL Validator Prompt
-SQL_VALIDATOR_PROMPT = PromptTemplate(
-    template="""\
-You are validating a query for a **SQLite** database.
-
-Database Schema:
-{schema}
-
-User Query:
-{query}
-
-Generated SQL Query:
-{sql}
-
-Is the generated **SQLite** SQL query valid and does it correctly address the user query based on the provided schema?
-
-Consider:
-- **SQLite** SQL syntax correctness
-- Table and column existence in the schema (if schema is provided). If schema is missing, validate syntax only.
-- Appropriateness of the query for the user's request.
-
-Respond with the required structure.
-""",
-    input_variables=["schema", "query", "sql"],
-)
+# Note: SQL validator prompt is now loaded from src/prompts/data_analyst/sql_validator.md
 
 def get_schema_node(state: DataTeamState) -> Dict[str, Any]:
     """Automatically gets the database schema before SQL generation."""
@@ -145,28 +91,28 @@ def prepare_data_query_node(state: DataTeamState) -> Dict[str, Any]:
 
     logger.info(f"👨‍💻 DATA TEAM: Found user query: '{last_human_message_content}'")
 
-    # Check for retry feedback
+    # Prepare template variables for the workflow prompt
     retry_feedback = state.get("validation_feedback", "")
     is_retrying_sql = state.get("generated_sql") is not None and state.get("validation_status") == "invalid"
-    retry_prompt_addition = ""
+    
+    # Build retry feedback text
+    retry_feedback_text = ""
     if is_retrying_sql and retry_feedback:
-        retry_prompt_addition = f"""
-
-Retry Feedback: You previously generated SQL that failed validation with the following feedback: '{retry_feedback}'. Please analyze this feedback and generate a corrected query."""
+        retry_feedback_text = f"You previously generated SQL that failed validation with the following feedback: '{retry_feedback}'. Please analyze this feedback and generate a corrected query."
     
-    # Include schema in the prompt if available
-    schema_text = state.get("schema", "")
-    schema_prompt_addition = ""
-    if schema_text:
-        schema_prompt_addition = f"""
-
-DATABASE SCHEMA (Use these exact table and column names):
-{schema_text}"""
+    # Prepare template variables
+    template_vars = {
+        "USER_QUERY": last_human_message_content,
+        "DATABASE_SCHEMA": state.get("schema", ""),
+        "RETRY_FEEDBACK": retry_feedback_text,
+    }
     
-    initial_prompt = REACT_AGENT_INITIAL_PROMPT.format(
-        query=last_human_message_content,
-        retry_feedback=retry_prompt_addition
-    ) + schema_prompt_addition
+    # Generate the prompt using the workflow template
+    initial_prompt = apply_workflow_prompt_template(
+        "data_analyst", 
+        "react_sql_generator", 
+        template_vars
+    )
 
     return {
         "messages": [HumanMessage(content=initial_prompt)],
@@ -262,14 +208,22 @@ def sql_validator_node(state: DataTeamState, llm_client: Any) -> Dict[str, Any]:
         if fetched_schema:
             schema = fetched_schema
 
-    llm = llm_client
-    prompt_str = SQL_VALIDATOR_PROMPT.format(
-        schema=schema,
-        query=state["natural_language_query"],
-        sql=state["generated_sql"]
+    # Prepare template variables for SQL validation
+    template_vars = {
+        "DATABASE_SCHEMA": schema,
+        "USER_QUERY": state["natural_language_query"],
+        "GENERATED_SQL": state["generated_sql"]
+    }
+    
+    # Generate the validation prompt using the workflow template
+    prompt_str = apply_workflow_prompt_template(
+        "data_analyst", 
+        "sql_validator", 
+        template_vars
     )
 
     try:
+        llm = llm_client
         structured_llm = llm.with_structured_output(SQLValidationResult)
         logger.info("Attempting SQL validation...")
         validation_result = structured_llm.invoke([HumanMessage(content=prompt_str)])

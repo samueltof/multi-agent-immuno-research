@@ -2,6 +2,7 @@ import os
 import re
 import json
 from datetime import datetime
+from typing import Dict, Any, Optional
 
 from langchain_core.prompts import PromptTemplate
 from langgraph.prebuilt.chat_agent_executor import AgentState
@@ -14,6 +15,53 @@ def get_prompt_template(prompt_name: str) -> str:
     # Replace `<<VAR>>` with `{VAR}`
     template = re.sub(r"<<([^>>]+)>>", r"{\1}", template)
     return template
+
+
+def get_workflow_prompt_template(agent_name: str, workflow_step: str) -> str:
+    """Load workflow-specific prompts from agent subdirectories."""
+    template_path = os.path.join(
+        os.path.dirname(__file__), 
+        agent_name, 
+        f"{workflow_step}.md"
+    )
+    
+    if not os.path.exists(template_path):
+        raise FileNotFoundError(f"Workflow prompt template not found: {template_path}")
+    
+    template = open(template_path).read()
+    # Escape curly braces using backslash
+    template = template.replace("{", "{{").replace("}", "}}")
+    # Replace `<<VAR>>` with `{VAR}`
+    template = re.sub(r"<<([^>>]+)>>", r"{\1}", template)
+    return template
+
+
+def apply_workflow_prompt_template(
+    agent_name: str, 
+    workflow_step: str, 
+    template_vars: Dict[str, Any]
+) -> str:
+    """Apply workflow-specific prompt template with custom variables."""
+    # Add common template variables
+    full_template_vars = {
+        "CURRENT_TIME": datetime.now().strftime("%a %b %d %Y %H:%M:%S %z"),
+        **template_vars
+    }
+    
+    # Handle empty values by replacing with empty string
+    for key, value in full_template_vars.items():
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            full_template_vars[key] = ""
+    
+    try:
+        template = get_workflow_prompt_template(agent_name, workflow_step)
+        prompt = PromptTemplate(
+            input_variables=list(full_template_vars.keys()),
+            template=template,
+        ).format(**full_template_vars)
+        return prompt
+    except Exception as e:
+        raise RuntimeError(f"Failed to apply workflow prompt template for {agent_name}/{workflow_step}: {str(e)}")
 
 
 def apply_prompt_template(prompt_name: str, state: AgentState) -> list:
