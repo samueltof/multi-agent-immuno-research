@@ -114,9 +114,49 @@ def apply_prompt_template(prompt_name: str, state: AgentState) -> list:
     if "biomedical_research_result" not in template_vars:
         template_vars["biomedical_research_result"] = ""
     
-    system_prompt = PromptTemplate(
-        input_variables=list(template_vars.keys()),
-        template=get_prompt_template(prompt_name),
-    ).format(**template_vars)
+    # Special handling for supervisor to support conditional content based on deep_thinking_mode
+    if prompt_name == "supervisor":
+        template_content = get_prompt_template(prompt_name)
+        
+        # Handle conditional sections based on deep_thinking_mode
+        deep_thinking_mode = state.get("deep_thinking_mode", False)
+        
+        if deep_thinking_mode:
+            # Remove the standard mode section
+            template_content = re.sub(
+                r'{%- else %}.*?{%- endif %}',
+                '',
+                template_content,
+                flags=re.DOTALL
+            )
+            # Remove the conditional markers for deep thinking mode
+            template_content = re.sub(r'{%- if deep_thinking_mode %}', '', template_content)
+        else:
+            # Remove the deep thinking mode section and keep standard mode
+            template_content = re.sub(
+                r'{%- if deep_thinking_mode %}.*?{%- else %}',
+                '',
+                template_content,
+                flags=re.DOTALL
+            )
+            # Remove the endif marker
+            template_content = re.sub(r'{%- endif %}', '', template_content)
+        
+        # Now process the template normally
+        # Escape curly braces using backslash
+        template_content = template_content.replace("{", "{{").replace("}", "}}")
+        # Replace `<<VAR>>` with `{VAR}`
+        template_content = re.sub(r"<<([^>>]+)>>", r"{\1}", template_content)
+        
+        system_prompt = PromptTemplate(
+            input_variables=list(template_vars.keys()),
+            template=template_content,
+        ).format(**template_vars)
+    else:
+        # Normal template processing for other prompts
+        system_prompt = PromptTemplate(
+            input_variables=list(template_vars.keys()),
+            template=get_prompt_template(prompt_name),
+        ).format(**template_vars)
     
     return [{"role": "system", "content": system_prompt}] + state["messages"]

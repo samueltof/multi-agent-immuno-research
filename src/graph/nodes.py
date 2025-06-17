@@ -145,6 +145,8 @@ def biomedical_researcher_graph_node(state: State) -> Command[Literal["superviso
 def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["biomedical_researcher"], Literal["__end__"]]]:
     """Supervisor node that decides which agent should act next."""
     logger.info("Supervisor evaluating next action")
+    deep_thinking_mode = state.get("deep_thinking_mode", False)
+    
     messages = apply_prompt_template("supervisor", state)
     response = (
         get_llm_by_type(AGENT_LLM_MAP["supervisor"])
@@ -152,11 +154,15 @@ def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Litera
         .invoke(messages)
     )
     goto = response["next"]
-    reasoning = response.get("reasoning", "No reasoning provided")
+    
+    if deep_thinking_mode:
+        reasoning = response.get("reasoning", "No reasoning provided")
+        logger.info(f"🧠 Deep Thinking Mode - Supervisor reasoning: {reasoning}")
+    else:
+        logger.info("🎯 Standard Mode - Basic supervisor routing")
     
     logger.debug(f"Current state messages: {state['messages']}")
     logger.debug(f"Supervisor response: {response}")
-    logger.info(f"Supervisor reasoning: {reasoning}")
 
     if goto == "FINISH":
         goto = "__end__"
