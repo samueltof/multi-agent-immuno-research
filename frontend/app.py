@@ -641,7 +641,6 @@ async def run_direct_workflow(messages: List[Dict], config: Dict) -> None:
             
             async for event in run_workflow_direct(
                 user_input_messages=user_input_messages,
-                debug=config.get("debug", False),
                 deep_thinking_mode=config.get("deep_thinking_mode", False),
                 search_before_planning=config.get("search_before_planning", False)
             ):
@@ -711,7 +710,6 @@ def stream_chat_response(api_url: str, messages: List[Dict], config: Dict) -> No
     """Stream chat response from the API - simplified version"""
     payload = {
         "messages": messages,
-        "debug": config.get("debug", False),
         "deep_thinking_mode": config.get("deep_thinking_mode", False),
         "search_before_planning": config.get("search_before_planning", False)
     }
@@ -882,12 +880,6 @@ def main():
         st.markdown('<div class="config-section">', unsafe_allow_html=True)
         st.markdown("### Settings")
         
-        debug_mode = st.checkbox(
-            "Debug Mode",
-            value=False,
-            help="Enable debug logging for detailed workflow information"
-        )
-        
         deep_thinking_mode = st.checkbox(
             "Deep Thinking Mode",
             value=False,
@@ -1037,7 +1029,6 @@ def main():
             
             # Configuration for execution
             config = {
-                "debug": debug_mode,
                 "deep_thinking_mode": deep_thinking_mode,
                 "search_before_planning": search_before_planning
             }
@@ -1157,12 +1148,6 @@ def main():
         # Create a clean settings display
         settings_html = f"""
         <div style="background: var(--light-gray); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-gray);">
-            <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
-                <span style="color: {'var(--navy-blue)' if debug_mode else 'var(--text-gray)'}; margin-right: 0.5rem;">
-                    {'🔍' if debug_mode else '⭕'}
-                </span>
-                <span style="font-weight: 500; color: var(--text-dark);">Debug Mode</span>
-            </div>
             <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
                 <span style="color: {'var(--navy-blue)' if deep_thinking_mode else 'var(--text-gray)'}; margin-right: 0.5rem;">
                     {'🧠' if deep_thinking_mode else '⭕'}
