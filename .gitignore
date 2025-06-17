@@ -26,3 +26,8 @@ src/service/database/.DS_Store
 
 # Generated outputs
 outputs/
+
+.DS_Store
+
+# LangGraph
+.langgraph_api/
