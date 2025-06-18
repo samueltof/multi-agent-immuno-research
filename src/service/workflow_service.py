@@ -70,6 +70,7 @@ async def run_agent_workflow(
             "search_before_planning": search_before_planning,
         },
         version="v2",
+        config={"recursion_limit": 50}  # Increase recursion limit from default 25 to 50
     ):
         kind = event.get("event")
         data = event.get("data")
