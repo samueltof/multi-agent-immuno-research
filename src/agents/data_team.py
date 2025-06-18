@@ -19,7 +19,7 @@ import re
 from pydantic import BaseModel, Field
 import logging
 
-from src.tools.database import get_database_schema, execute_sql_query, get_random_subsamples
+from src.tools.database import get_database_schema, execute_sql_query, execute_sql_query_and_save, get_random_subsamples
 from src.prompts import apply_workflow_prompt_template
 
 logger = logging.getLogger(__name__)
@@ -139,8 +139,8 @@ def extract_schema_or_sql_node(state: DataTeamState) -> Dict[str, Any]:
     if isinstance(last_message, AIMessage) and last_message.content:
         content = last_message.content.strip()
         
-        is_likely_schema = "database schema:" in content.lower() or "table:" in content.lower() and "columns:" in content.lower()
-        sql_keywords = ["SELECT ", "INSERT ", "UPDATE ", "DELETE ", "CREATE ", "DROP ", "ALTER "]
+        is_likely_schema = "database schema:" in content.lower() or ("table:" in content.lower() and "columns:" in content.lower())
+        sql_keywords = ["SELECT ", "INSERT ", "UPDATE ", "DELETE ", "CREATE ", "DROP ", "ALTER ", "WITH "]
         is_sql = any(kw in content.upper() for kw in sql_keywords)
         
         # Check for SQL in markdown blocks
@@ -152,10 +152,11 @@ def extract_schema_or_sql_node(state: DataTeamState) -> Dict[str, Any]:
                 logger.info(f"👨‍💻 DATA TEAM: Extracted SQL (from markdown block): {extracted_sql_from_markdown}")
                 return {"generated_sql": extracted_sql_from_markdown, "provided_schema_text": None, "validation_feedback": None}
 
-        if is_sql and not is_likely_schema:
+        # Prioritize SQL detection over schema detection
+        if is_sql:
             logger.info(f"👨‍💻 DATA TEAM: Extracted SQL (raw content): {content}")
             return {"generated_sql": content, "provided_schema_text": None, "validation_feedback": None}
-        elif is_likely_schema and not is_sql:
+        elif is_likely_schema:
             logger.info(f"👨‍💻 DATA TEAM: Identified as schema description: {content[:150]}...")
             return {"provided_schema_text": content, "generated_sql": None}
         else:
@@ -234,7 +235,7 @@ def sql_validator_node(state: DataTeamState, llm_client: Any) -> Dict[str, Any]:
         return {"validation_status": "error", "validation_feedback": f"Failed during validation: {str(e)}"}
 
 def sql_executor_node(state: DataTeamState) -> Dict[str, Any]:
-    """Executes the validated SQL query using the tool."""
+    """Executes the validated SQL query using the appropriate tool based on expected result size."""
     logger.info("👨‍💻 DATA TEAM: Executing SQL...")
     if state.get("error_message") or not state.get("generated_sql") or state.get("validation_status") != "valid" or state.get("provided_schema_text"):
         if state.get("validation_status") != "valid" and not state.get("provided_schema_text"):
@@ -242,7 +243,44 @@ def sql_executor_node(state: DataTeamState) -> Dict[str, Any]:
         return {}
 
     try:
-        execution_result = execute_sql_query.invoke({"query": state["generated_sql"]})
+        # First, try to estimate the result size by running a COUNT query
+        sql_query = state["generated_sql"]
+        query_lower = sql_query.lower().strip()
+        
+        # Determine if we should use file-based approach based on query characteristics
+        use_file_approach = False
+        
+        # Check for patterns that typically return large datasets
+        large_dataset_indicators = [
+            "join" in query_lower and "group by" in query_lower,  # Complex aggregations
+            "cross join" in query_lower,  # Cartesian products
+            "window" in query_lower or "over(" in query_lower,  # Window functions
+            sql_query.count("join") > 2,  # Multiple joins
+            "statistical" in state.get("natural_language_query", "").lower(),
+            "significance" in state.get("natural_language_query", "").lower(),
+            "diversity" in state.get("natural_language_query", "").lower(),
+        ]
+        
+        # Use file approach if query suggests large results or complex analysis
+        if any(large_dataset_indicators):
+            use_file_approach = True
+            logger.info("👨‍💻 DATA TEAM: Using file-based execution for potentially large/complex results")
+        
+        if use_file_approach:
+            # Generate a meaningful description for the saved file
+            query_description = state.get("natural_language_query", "data_analysis")
+            if len(query_description) > 100:
+                query_description = query_description[:100] + "..."
+            
+            execution_result = execute_sql_query_and_save.invoke({
+                "query": sql_query,
+                "description": query_description
+            })
+        else:
+            # Use regular execution for smaller expected results
+            logger.info("👨‍💻 DATA TEAM: Using standard execution for smaller expected results")
+            execution_result = execute_sql_query.invoke({"query": sql_query})
+        
         logger.info("👨‍💻 DATA TEAM: Execution result obtained.")
         return {"execution_result": execution_result}
     except Exception as e:

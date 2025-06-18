@@ -13,6 +13,9 @@ from src.tools import (
     tavily_tool,
     execute_sql_query,
     get_database_schema,
+    read_csv_file,
+    load_csv_as_dataframe,
+    extract_file_paths_from_conversation,
 )
 
 from .llm import get_llm_by_type
@@ -31,7 +34,7 @@ research_agent = create_react_agent(
 
 coder_agent = create_react_agent(
     get_llm_by_type(AGENT_LLM_MAP["coder"]),
-    tools=[python_repl_tool, bash_tool],
+    tools=[python_repl_tool, bash_tool, read_csv_file, load_csv_as_dataframe, extract_file_paths_from_conversation],
     prompt=lambda state: apply_prompt_template("coder", state),
 )
 

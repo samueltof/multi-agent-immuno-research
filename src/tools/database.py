@@ -2,6 +2,9 @@ from langchain_core.tools import tool
 import pandas as pd
 from typing import Optional, List, Dict, Any
 import logging
+import os
+import uuid
+from datetime import datetime
 
 from src.config.database import DatabaseSettings
 from src.service.database import DatabaseManager
@@ -54,6 +57,131 @@ def execute_sql_query(query: str) -> str:
         
     except Exception as e:
         error_msg = f"Error executing SQL query: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        return error_msg
+
+
+@tool
+def execute_sql_query_and_save(query: str, description: str = "") -> str:
+    """Executes a SQL query and saves the full results to a CSV file for downstream processing.
+    
+    This tool provides a hybrid approach: shows meaningful summary and preview in the message
+    while saving complete data to file for detailed analysis by specialized agents.
+    
+    Args:
+        query: The SQL query string to be executed.
+        description: Optional description of what the query does (for file naming).
+        
+    Returns:
+        A string containing summary, key insights, preview, and file path information.
+    """
+    try:
+        logger.info(f"🛠️ Executing SQL query and saving results: {query[:100]}...")
+        
+        # Get database manager
+        db_manager = get_database_manager()
+        
+        # Execute query and get results as DataFrame
+        result_df = db_manager.execute_query_df(query)
+        
+        if result_df.empty:
+            return "Query executed successfully but returned no results."
+        
+        # Create outputs directory if it doesn't exist
+        outputs_dir = "outputs"
+        os.makedirs(outputs_dir, exist_ok=True)
+        
+        # Generate a unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        query_id = str(uuid.uuid4())[:8]
+        
+        # Clean description for filename
+        if description:
+            clean_desc = "".join(c for c in description if c.isalnum() or c in (' ', '_', '-')).rstrip()
+            clean_desc = clean_desc.replace(' ', '_')[:50]  # Max 50 chars
+            filename = f"query_results_{clean_desc}_{timestamp}_{query_id}.csv"
+        else:
+            filename = f"query_results_{timestamp}_{query_id}.csv"
+        
+        file_path = os.path.join(outputs_dir, filename)
+        
+        # Save the DataFrame to CSV
+        result_df.to_csv(file_path, index=False)
+        
+        # Generate meaningful summary and insights
+        total_rows = len(result_df)
+        total_cols = len(result_df.columns)
+        
+        # Provide intelligent preview based on dataset size
+        if total_rows <= 20:
+            # Small dataset: show all rows
+            preview_rows = total_rows
+            preview_note = "(complete dataset)"
+            preview = result_df.to_string(index=False)
+        elif total_rows <= 100:
+            # Medium dataset: show first 20 rows
+            preview_rows = 20
+            preview_note = f"(showing first {preview_rows} rows)"
+            preview = result_df.head(preview_rows).to_string(index=False)
+        else:
+            # Large dataset: show first 15 rows + summary statistics
+            preview_rows = 15
+            preview_note = f"(showing first {preview_rows} rows)"
+            preview = result_df.head(preview_rows).to_string(index=False)
+        
+        # Generate key insights for numeric columns
+        insights = []
+        numeric_cols = result_df.select_dtypes(include=['number']).columns
+        if len(numeric_cols) > 0:
+            insights.append("\n📊 **Key Insights:**")
+            for col in numeric_cols[:3]:  # Limit to first 3 numeric columns
+                col_stats = result_df[col].describe()
+                insights.append(f"- {col}: Mean={col_stats['mean']:.2f}, Std={col_stats['std']:.2f}, Range=[{col_stats['min']:.2f}, {col_stats['max']:.2f}]")
+        
+        # Check for categorical patterns
+        categorical_cols = result_df.select_dtypes(include=['object']).columns
+        if len(categorical_cols) > 0 and len(categorical_cols) <= 3:
+            insights.append("\n📈 **Data Distribution:**")
+            for col in categorical_cols:
+                unique_count = result_df[col].nunique()
+                if unique_count <= 10:  # Only show for columns with reasonable number of categories
+                    top_values = result_df[col].value_counts().head(3)
+                    insights.append(f"- {col}: {unique_count} unique values, top: {dict(top_values)}")
+        
+        insights_text = "\n".join(insights) if insights else ""
+        
+        # Create comprehensive result string
+        result_str = f"""Query executed successfully and results saved to file.
+
+📋 **Summary:**
+- Total rows: {total_rows:,}
+- Total columns: {total_cols}
+- Columns: {', '.join(result_df.columns.tolist())}
+
+🗂️ **DATASET FILE #{query_id}**: `{file_path}`
+📁 **FULL PATH**: {os.path.abspath(file_path)}
+🏷️ **FILE ID**: {query_id}
+📝 **DESCRIPTION**: {description if description else 'Data analysis results'}{insights_text}
+
+📄 **Data Preview** {preview_note}:
+{preview}
+
+💾 **For Detailed Analysis:**
+The complete dataset ({total_rows:,} rows) has been saved to '{file_path}' and can be loaded by specialized analysis agents using file loading tools.
+
+🔧 **Next Steps for Analysis Agents:**
+- Use `read_csv_file('{file_path}')` to inspect the dataset structure
+- Use `load_csv_as_dataframe('{file_path}')` to get loading code for the complete dataset
+- Reference this dataset as "File #{query_id}" in subsequent analysis"""
+        
+        if total_rows > 100:
+            result_str += f"\n\n⚠️  **Note**: This message shows a preview for context. The complete dataset with all {total_rows:,} rows is available in the saved file for comprehensive analysis."
+        
+        logger.info(f"🔘 SQL query executed successfully, {len(result_df)} rows saved to {file_path}")
+        return result_str
+        
+    except Exception as e:
+        error_msg = f"Error executing SQL query and saving results: {str(e)}"
         logger.error(f"❌ {error_msg}")
         return error_msg
 
