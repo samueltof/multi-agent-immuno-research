@@ -8,6 +8,7 @@ from src.tools import (
     bash_tool,
     browser_tool,
     crawl_tool,
+    crawl_many_tool,
     python_sandbox_tool,
     python_repl_tool,
     tavily_tool,
@@ -28,7 +29,11 @@ from .biomedical_researcher import (
 # Create agents using configured LLM types
 research_agent = create_react_agent(
     get_llm_by_type(AGENT_LLM_MAP["researcher"]),
-    tools=[tavily_tool, crawl_tool],
+    tools=[
+        tavily_tool, 
+        crawl_tool,
+        crawl_many_tool
+    ],
     prompt=lambda state: apply_prompt_template("researcher", state),
 )
 

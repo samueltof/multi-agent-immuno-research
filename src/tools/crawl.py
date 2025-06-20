@@ -398,10 +398,98 @@ async def crawl_and_chunk_markdown_tool(
         ]
 
 
+# Sync wrappers for async tools (for LangGraph compatibility)
+def crawl_recursive_sync_tool(
+    start_urls: List[str],
+    max_depth: int = 3,
+    domain_filter: Optional[str] = None,
+    max_concurrent: int = 10
+) -> List[dict]:
+    """
+    Sync wrapper for recursive crawling tool.
+    
+    Args:
+        start_urls: Starting URLs to crawl
+        max_depth: Maximum depth to crawl
+        domain_filter: Optional domain filter for links
+        max_concurrent: Maximum concurrent requests
+        
+    Returns:
+        List of dictionaries with crawled content
+    """
+    try:
+        # Run the async function in a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(
+                crawl_recursive_tool(start_urls, max_depth, domain_filter, max_concurrent)
+            )
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.error(f"Failed to run recursive crawl sync: {e}")
+        return [
+            {
+                "url": url,
+                "title": "Failed to crawl",
+                "content": f"Error: {str(e)}",
+                "markdown": None,
+                "text": None,
+                "success": False,
+                "content_length": 0,
+                "metadata": {}
+            }
+            for url in start_urls
+        ]
+
+
+def crawl_and_chunk_markdown_sync_tool(
+    url: str,
+    chunk_size: int = 1000,
+    max_concurrent: int = 10
+) -> List[dict]:
+    """
+    Sync wrapper for markdown chunking tool.
+    
+    Args:
+        url: URL to crawl
+        chunk_size: Maximum size per chunk
+        max_concurrent: Maximum concurrent requests
+        
+    Returns:
+        List of chunks with metadata
+    """
+    try:
+        # Run the async function in a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(
+                crawl_and_chunk_markdown_tool(url, chunk_size, max_concurrent)
+            )
+        finally:
+            loop.close()
+    except Exception as e:
+        logger.error(f"Failed to run markdown chunking sync: {e}")
+        return [
+            {
+                'chunk_index': 0,
+                'content': f"Error: {str(e)}",
+                'url': url,
+                'title': "Failed to crawl",
+                'headers': [],
+                'success': False
+            }
+        ]
+
+
 # Export tools for use by agents
 __all__ = [
     "crawl_tool",
     "crawl_many_tool", 
+    "crawl_recursive_sync_tool",
+    "crawl_and_chunk_markdown_sync_tool",
     "acrawl_tool",
     "acrawl_many_tool",
     "acrawl_many_stream_tool",

@@ -1,4 +1,15 @@
-from .crawl import crawl_tool
+from .crawl import (
+    crawl_tool,
+    crawl_many_tool,
+    # Keep async tools available for future use but don't export by default
+    # acrawl_tool,
+    # acrawl_many_tool,
+    # acrawl_many_stream_tool,
+    # crawl_recursive_tool,
+    # crawl_and_chunk_markdown_tool,
+    # crawl_recursive_sync_tool,
+    # crawl_and_chunk_markdown_sync_tool
+)
 from .file_management import write_file_tool, read_csv_file, load_csv_as_dataframe, extract_file_paths_from_conversation
 from .python_repl import python_repl_tool
 from .python_sandbox import python_sandbox_tool
@@ -16,6 +27,8 @@ from .tcr_analysis import (
 __all__ = [
     "bash_tool",
     "crawl_tool",
+    "crawl_many_tool",
+    # Essential crawl tools only - others available in crawl.py if needed
     "tavily_tool",
     "python_repl_tool",
     "python_sandbox_tool",
