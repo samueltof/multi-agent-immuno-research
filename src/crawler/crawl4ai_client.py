@@ -17,10 +17,11 @@ from crawl4ai import (
     BrowserConfig, 
     CrawlerRunConfig, 
     CacheMode,
-    MemoryAdaptiveDispatcher
+    MemoryAdaptiveDispatcher,
+    LLMConfig
 )
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
-from crawl4ai.content_filter_strategy import BM25ContentFilter, PruningContentFilter
+from crawl4ai.content_filter_strategy import BM25ContentFilter, PruningContentFilter, LLMContentFilter
 
 from .readability_extractor import ReadabilityExtractor
 from .article import Article
@@ -44,6 +45,14 @@ class Crawl4AIConfig:
         "--disable-dev-shm-usage", 
         "--no-sandbox"
     ])
+    
+    # LLM Content Filtering Options (DEFAULT: ENABLED)
+    use_llm_filter: bool = True  # Default to LLM filtering for better quality
+    llm_provider: str = "openai/gpt-4o-mini"  # More cost-effective option
+    llm_api_token: Optional[str] = None  # Will use environment variable if None
+    llm_filter_instruction: Optional[str] = None  # Custom instruction for LLM filtering
+    chunk_token_threshold: int = 4096  # Token threshold for chunking
+    llm_filter_verbose: bool = False  # Reduce noise in logs by default
 
 
 class Crawl4AIClient:
@@ -63,18 +72,72 @@ class Crawl4AIClient:
             extra_args=self.config.extra_browser_args
         )
         
-        # Content filter for token efficiency (prune noise)
-        self.content_filter = PruningContentFilter(
-            threshold=0.48,  # Balanced pruning threshold
-            min_word_threshold=30  # Keep sections with at least 30 words
-        )
+        # Content filter setup - choose between Pruning and LLM filtering
+        if self.config.use_llm_filter:
+            # LLM-based content filtering for high-quality extraction
+            # Auto-detect available API keys
+            api_token = self.config.llm_api_token
+            if not api_token:
+                # Try to use available API keys
+                import os
+                api_token = (
+                    os.getenv("OPENAI_API_KEY") or 
+                    os.getenv("BASIC_API_KEY") or 
+                    os.getenv("REASONING_API_KEY")
+                )
+            
+            llm_config = LLMConfig(
+                provider=self.config.llm_provider,
+                api_token=api_token
+            )
+            
+            # Default instruction optimized for research and technical content
+            default_instruction = """
+            Focus on extracting the core educational and informational content.
+            Include:
+            - Key concepts, explanations, and insights
+            - Important code examples and technical details
+            - Main article content and research findings
+            - Essential documentation and tutorials
+            
+            Exclude:
+            - Navigation menus and sidebars
+            - Advertisement content
+            - Footer and header boilerplate
+            - Cookie notices and popups
+            - Social media widgets and sharing buttons
+            - Comments sections (unless specifically relevant)
+            
+            Format the output as clean, well-structured markdown with:
+            - Proper headers (# ## ###)
+            - Code blocks with appropriate language tags
+            - Clean bullet points and numbered lists
+            - Preserved links for important references
+            
+            Optimize for token efficiency while maintaining content quality.
+            """
+            
+            instruction = self.config.llm_filter_instruction or default_instruction
+            
+            self.content_filter = LLMContentFilter(
+                llm_config=llm_config,
+                instruction=instruction,
+                chunk_token_threshold=self.config.chunk_token_threshold,
+                verbose=self.config.llm_filter_verbose
+            )
+        else:
+            # Default: Pruning-based content filtering for speed and efficiency
+            self.content_filter = PruningContentFilter(
+                threshold=0.48,  # Balanced pruning threshold
+                min_word_threshold=30  # Keep sections with at least 30 words
+            )
         
         # Advanced markdown generator with content filtering
         self.markdown_generator = DefaultMarkdownGenerator(
             content_source="cleaned_html",  # Use cleaned HTML for better results
             content_filter=self.content_filter,
             options={
-                "ignore_links": True,  # Keep links for reference
+                "ignore_links": False,  # Keep links for reference (especially useful with LLM filtering)
                 "ignore_images": True,  # Remove images to reduce token usage
                 "escape_html": True,
                 "body_width": 0,  # No line wrapping
@@ -184,7 +247,9 @@ class Crawl4AIClient:
                 'markdown_info': {
                     'has_fit_markdown': hasattr(result.markdown, 'fit_markdown') if hasattr(result, 'markdown') else False,
                     'has_citations': hasattr(result.markdown, 'markdown_with_citations') if hasattr(result, 'markdown') else False,
-                    'content_filtered': self.content_filter is not None
+                    'content_filtered': self.content_filter is not None,
+                    'filter_type': 'llm' if self.config.use_llm_filter else 'pruning',
+                    'llm_provider': self.config.llm_provider if self.config.use_llm_filter else None
                 },
                 **(result.metadata if hasattr(result, 'metadata') and result.metadata else {})
             }
