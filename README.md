@@ -67,7 +67,7 @@ uv run main.py
 
 The Multi-Agent Immunological Research System implements a hierarchical multi-agent architecture where specialized agents collaborate to accomplish complex immunological research tasks:
 
-![Multi-Agent Architecture](./assets/architecture.png)
+![Multi-Agent Architecture](./assets/workflow_diagram_corrected.png)
 
 The system consists of the following specialized agents working together:
 
