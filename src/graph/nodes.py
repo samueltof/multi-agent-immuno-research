@@ -142,7 +142,7 @@ def biomedical_researcher_graph_node(state: State) -> Command[Literal["superviso
     )
 
 
-def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["browser"], Literal["reporter"], Literal["data_analyst"], Literal["biomedical_researcher"], Literal["__end__"]]]:
+def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["reporter"], Literal["data_analyst"], Literal["biomedical_researcher"], Literal["__end__"]]]:
     """Supervisor node that decides which agent should act next."""
     logger.info("Supervisor evaluating next action")
     deep_thinking_mode = state.get("deep_thinking_mode", False)

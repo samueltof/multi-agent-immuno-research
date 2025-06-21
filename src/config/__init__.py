@@ -18,7 +18,7 @@ from .env import (
 from .tools import TAVILY_MAX_RESULTS
 
 # Team configuration
-TEAM_MEMBERS = ["researcher", "coder", "browser", "reporter", "data_analyst", "biomedical_researcher"]
+TEAM_MEMBERS = ["researcher", "coder", "reporter", "data_analyst", "biomedical_researcher"]
 
 __all__ = [
     # Reasoning LLM
