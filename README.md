@@ -3,24 +3,14 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[English](./README.md) | [简体中文](./README_zh.md)
+[English](./README.md)
 
 > Advancing Immunological Research Through AI
 
 Multi-Agent Immunological Research System is an AI-powered framework designed for comprehensive analysis of T-cell receptor (TCR) databases and immunological research. Built upon a multi-agent architecture inspired by [LangManus](https://github.com/langmanus/langmanus), this system combines language models with specialized biomedical tools for tasks like literature search, data analysis, and immunological insights generation.
 
-## Demo Video
-
-> **Task**: Analyze TCR sequences from VDJDB and correlate with published research to identify novel therapeutic targets for autoimmune diseases.
-
-[![Demo](./assets/demo.gif)](./assets/demo.mp4)
-
-- [View on YouTube](https://youtu.be/sZCHqrQBUGk)
-- [Download Video](https://github.com/langmanus/langmanus/blob/main/assets/demo.mp4)
-
 ## Table of Contents
 - [Multi-Agent Immunological Research System](#multi-agent-immunological-research-system)
-  - [Demo Video](#demo-video)
   - [Table of Contents](#table-of-contents)
   - [Quick Start](#quick-start)
   - [Architecture](#architecture)
