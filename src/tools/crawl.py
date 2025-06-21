@@ -1,6 +1,6 @@
 """
 Enhanced crawl tools using improved Crawl4AI implementation.
-Provides clean content extraction with advanced features.
+Provides clean content extraction with minimal output for token efficiency.
 """
 
 import asyncio
@@ -21,30 +21,35 @@ def crawl_tool(url: str, backend: str = "crawl4ai") -> dict:
         backend: Backend to use ("crawl4ai" or "jina")
         
     Returns:
-        Dictionary with crawled content
+        Dictionary with essential crawled content (url, title, markdown, success)
     """
     try:
         # Configure for optimal performance
         config = Crawl4AIConfig(
-            headless=True,
-            verbose=False,
-            max_concurrent=10,
-            memory_threshold_percent=70.0,
-            bypass_cache=True
+            bypass_cache=True,
+            timeout=30,
+            verbose=False
         )
         
         crawler = Crawler(backend=backend, crawl4ai_config=config)
         article = crawler.crawl(url)
         
+        # Use fit_markdown if available, otherwise fall back to markdown
+        markdown_content = None
+        if hasattr(article, 'markdown') and article.markdown:
+            if hasattr(article.markdown, 'fit_markdown') and article.markdown.fit_markdown:
+                markdown_content = article.markdown.fit_markdown
+            elif hasattr(article.markdown, 'raw_markdown') and article.markdown.raw_markdown:
+                markdown_content = article.markdown.raw_markdown
+            else:
+                # If it's a string (older API), use it directly
+                markdown_content = str(article.markdown)
+        
         return {
             "url": article.url,
             "title": article.title,
-            "content": article.content,
-            "markdown": article.markdown,
-            "text": article.text,
+            "markdown": markdown_content,
             "success": article.success,
-            "content_length": len(article.content) if article.content else 0,
-            "metadata": getattr(article, 'metadata', {})
         }
         
     except Exception as e:
@@ -52,74 +57,205 @@ def crawl_tool(url: str, backend: str = "crawl4ai") -> dict:
         return {
             "url": url,
             "title": "Failed to crawl",
-            "content": f"Error: {str(e)}",
-            "markdown": None,
-            "text": None,
+            "markdown": f"Error: {str(e)}",
             "success": False,
-            "content_length": 0,
-            "metadata": {}
         }
 
 
-def crawl_many_tool(
-    urls: List[str], 
-    backend: str = "crawl4ai",
-    max_concurrent: int = 10
-) -> List[dict]:
+def crawl_many_tool(urls: List[str], backend: str = "crawl4ai") -> List[dict]:
     """
-    Crawl multiple URLs in parallel and extract clean content.
+    Crawl multiple URLs concurrently and extract clean content.
     
     Args:
         urls: List of URLs to crawl
         backend: Backend to use ("crawl4ai" or "jina")
-        max_concurrent: Maximum concurrent requests
         
     Returns:
-        List of dictionaries with crawled content
+        List of dictionaries with crawled content for each URL
     """
     try:
+        # Configure for optimal performance
         config = Crawl4AIConfig(
-            headless=True,
-            verbose=False,
-            max_concurrent=max_concurrent,
-            memory_threshold_percent=70.0,
-            bypass_cache=True
+            bypass_cache=True,
+            timeout=30,
+            verbose=False
         )
         
         crawler = Crawler(backend=backend, crawl4ai_config=config)
-        articles = crawler.crawl_many(urls)
-        
         results = []
-        for article in articles:
-            results.append({
-                "url": article.url,
-                "title": article.title,
-                "content": article.content,
-                "markdown": article.markdown,
-                "text": article.text,
-                "success": article.success,
-                "content_length": len(article.content) if article.content else 0,
-                "metadata": getattr(article, 'metadata', {})
-            })
+        
+        for url in urls:
+            try:
+                article = crawler.crawl(url)
+                
+                # Use fit_markdown if available, otherwise fall back to markdown
+                markdown_content = None
+                if hasattr(article, 'markdown') and article.markdown:
+                    if hasattr(article.markdown, 'fit_markdown') and article.markdown.fit_markdown:
+                        markdown_content = article.markdown.fit_markdown
+                    elif hasattr(article.markdown, 'raw_markdown') and article.markdown.raw_markdown:
+                        markdown_content = article.markdown.raw_markdown
+                    else:
+                        # If it's a string (older API), use it directly
+                        markdown_content = str(article.markdown)
+                
+                results.append({
+                    "url": article.url,
+                    "title": article.title,
+                    "markdown": markdown_content,
+                    "success": article.success,
+                })
+                
+            except Exception as e:
+                logger.error(f"Failed to crawl {url}: {e}")
+                results.append({
+                    "url": url,
+                    "title": "Failed to crawl",
+                    "markdown": f"Error: {str(e)}",
+                    "success": False,
+                })
         
         return results
         
     except Exception as e:
-        logger.error(f"Failed to crawl URLs: {e}")
-        # Return error results for all URLs
+        logger.error(f"Failed to crawl multiple URLs: {e}")
         return [
             {
                 "url": url,
                 "title": "Failed to crawl",
-                "content": f"Error: {str(e)}",
-                "markdown": None,
-                "text": None,
+                "markdown": f"Error: {str(e)}",
                 "success": False,
-                "content_length": 0,
-                "metadata": {}
             }
             for url in urls
         ]
+
+
+async def crawl_many_tool_async(urls: List[str], backend: str = "crawl4ai") -> AsyncGenerator[dict, None]:
+    """
+    Asynchronously crawl multiple URLs and yield results as they complete.
+    
+    Args:
+        urls: List of URLs to crawl
+        backend: Backend to use ("crawl4ai" or "jina")
+        
+    Yields:
+        Dictionary with crawled content for each completed URL
+    """
+    # Configure for optimal performance
+    config = Crawl4AIConfig(
+        bypass_cache=True,
+        timeout=30,
+        verbose=False
+    )
+    
+    crawler = Crawler(backend=backend, crawl4ai_config=config)
+    
+    async def crawl_single(url: str) -> dict:
+        """Crawl a single URL asynchronously."""
+        try:
+            # For async operations, we might need to run in executor
+            # This depends on the crawler implementation
+            article = await asyncio.get_event_loop().run_in_executor(
+                None, crawler.crawl, url
+            )
+            
+            # Use fit_markdown if available, otherwise fall back to markdown
+            markdown_content = None
+            if hasattr(article, 'markdown') and article.markdown:
+                if hasattr(article.markdown, 'fit_markdown') and article.markdown.fit_markdown:
+                    markdown_content = article.markdown.fit_markdown
+                elif hasattr(article.markdown, 'raw_markdown') and article.markdown.raw_markdown:
+                    markdown_content = article.markdown.raw_markdown
+                else:
+                    # If it's a string (older API), use it directly
+                    markdown_content = str(article.markdown)
+            
+            return {
+                "url": article.url,
+                "title": article.title,
+                "markdown": markdown_content,
+                "success": article.success,
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to crawl {url}: {e}")
+            return {
+                "url": url,
+                "title": "Failed to crawl",
+                "markdown": f"Error: {str(e)}",
+                "success": False,
+            }
+    
+    # Create tasks for all URLs
+    tasks = [crawl_single(url) for url in urls]
+    
+    # Yield results as they complete
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        yield result
+
+
+async def crawl_stream_tool(
+    urls: List[str], 
+    backend: str = "crawl4ai",
+    max_concurrent: int = 3
+) -> AsyncGenerator[dict, None]:
+    """
+    Crawl multiple URLs with streaming results (async generator).
+    
+    Args:
+        urls: List of URLs to crawl
+        backend: Backend to use ("crawl4ai" or "jina")
+        max_concurrent: Maximum number of concurrent crawls
+        
+    Yields:
+        Dictionary with crawled content for each URL as completed
+    """
+    # Configure for optimal performance
+    config = Crawl4AIConfig(
+        word_count_threshold=10,
+        exclude_external_links=True,
+        remove_overlay_elements=True,
+        process_iframes=True
+    )
+    
+    async def crawl_single_async(url: str) -> dict:
+        """Async wrapper for single crawl"""
+        try:
+            crawler = Crawler(backend=backend, crawl4ai_config=config)
+            article = crawler.crawl(url)
+            
+            # Use fit_markdown for cleaner output if available, fallback to markdown
+            markdown_content = getattr(article, 'fit_markdown', None) or article.markdown
+            
+            return {
+                "url": article.url,
+                "title": article.title,
+                "markdown": markdown_content,
+                "success": article.success,
+            }
+        except Exception as e:
+            logger.error(f"Failed to crawl {url}: {e}")
+            return {
+                "url": url,
+                "title": "Failed to crawl",
+                "markdown": f"Error: {str(e)}",
+                "success": False,
+            }
+    
+    # Create semaphore for concurrency control
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def crawl_with_semaphore(url):
+        async with semaphore:
+            return await crawl_single_async(url)
+    
+    # Create tasks and yield results as they complete
+    tasks = [asyncio.create_task(crawl_with_semaphore(url)) for url in urls]
+    
+    for task in asyncio.as_completed(tasks):
+        result = await task
+        yield result
 
 
 async def acrawl_tool(url: str, backend: str = "crawl4ai") -> dict:
@@ -131,7 +267,7 @@ async def acrawl_tool(url: str, backend: str = "crawl4ai") -> dict:
         backend: Backend to use ("crawl4ai" or "jina")
         
     Returns:
-        Dictionary with crawled content
+        Dictionary with essential crawled content
     """
     try:
         config = Crawl4AIConfig(
@@ -148,12 +284,8 @@ async def acrawl_tool(url: str, backend: str = "crawl4ai") -> dict:
         return {
             "url": article.url,
             "title": article.title,
-            "content": article.content,
             "markdown": article.markdown,
-            "text": article.text,
             "success": article.success,
-            "content_length": len(article.content) if article.content else 0,
-            "metadata": getattr(article, 'metadata', {})
         }
         
     except Exception as e:
@@ -161,12 +293,8 @@ async def acrawl_tool(url: str, backend: str = "crawl4ai") -> dict:
         return {
             "url": url,
             "title": "Failed to crawl",
-            "content": f"Error: {str(e)}",
-            "markdown": None,
-            "text": None,
+            "markdown": f"Error: {str(e)}",
             "success": False,
-            "content_length": 0,
-            "metadata": {}
         }
 
 
@@ -184,7 +312,7 @@ async def acrawl_many_tool(
         max_concurrent: Maximum concurrent requests
         
     Returns:
-        List of dictionaries with crawled content
+        List of dictionaries with essential crawled content
     """
     try:
         config = Crawl4AIConfig(
@@ -203,12 +331,8 @@ async def acrawl_many_tool(
             results.append({
                 "url": article.url,
                 "title": article.title,
-                "content": article.content,
                 "markdown": article.markdown,
-                "text": article.text,
                 "success": article.success,
-                "content_length": len(article.content) if article.content else 0,
-                "metadata": getattr(article, 'metadata', {})
             })
         
         return results
@@ -219,12 +343,8 @@ async def acrawl_many_tool(
             {
                 "url": url,
                 "title": "Failed to crawl",
-                "content": f"Error: {str(e)}",
-                "markdown": None,
-                "text": None,
+                "markdown": f"Error: {str(e)}",
                 "success": False,
-                "content_length": 0,
-                "metadata": {}
             }
             for url in urls
         ]
@@ -243,7 +363,7 @@ async def acrawl_many_stream_tool(
         max_concurrent: Maximum concurrent requests
         
     Yields:
-        Dictionaries with crawled content as they complete
+        Dictionaries with essential crawled content as they complete
     """
     try:
         config = Crawl4AIConfig(
@@ -260,12 +380,8 @@ async def acrawl_many_stream_tool(
             yield {
                 "url": article.url,
                 "title": article.title,
-                "content": article.content,
                 "markdown": article.markdown,
-                "text": article.text,
                 "success": article.success,
-                "content_length": len(article.content) if article.content else 0,
-                "metadata": getattr(article, 'metadata', {})
             }
             
     except Exception as e:
@@ -274,12 +390,8 @@ async def acrawl_many_stream_tool(
             yield {
                 "url": url,
                 "title": "Failed to crawl",
-                "content": f"Error: {str(e)}",
-                "markdown": None,
-                "text": None,
+                "markdown": f"Error: {str(e)}",
                 "success": False,
-                "content_length": 0,
-                "metadata": {}
             }
 
 
@@ -290,17 +402,16 @@ async def crawl_recursive_tool(
     max_concurrent: int = 10
 ) -> List[dict]:
     """
-    Recursively crawl a site following internal links.
-    Only available with Crawl4AI backend.
+    Recursively crawl URLs up to a specified depth.
     
     Args:
-        start_urls: Starting URLs to crawl
-        max_depth: Maximum depth to crawl
-        domain_filter: Optional domain filter for links
+        start_urls: Initial URLs to start crawling from
+        max_depth: Maximum depth to crawl (default: 3)
+        domain_filter: Optional domain filter to limit crawling scope
         max_concurrent: Maximum concurrent requests
         
     Returns:
-        List of dictionaries with crawled content
+        List of dictionaries with essential crawled content
     """
     try:
         config = Crawl4AIConfig(
@@ -312,7 +423,7 @@ async def crawl_recursive_tool(
         )
         
         crawler = Crawler(backend="crawl4ai", crawl4ai_config=config)
-        articles = await crawler.crawl_recursive(
+        articles = await crawler.acrawl_recursive(
             start_urls=start_urls,
             max_depth=max_depth,
             domain_filter=domain_filter
@@ -323,28 +434,20 @@ async def crawl_recursive_tool(
             results.append({
                 "url": article.url,
                 "title": article.title,
-                "content": article.content,
                 "markdown": article.markdown,
-                "text": article.text,
                 "success": article.success,
-                "content_length": len(article.content) if article.content else 0,
-                "metadata": getattr(article, 'metadata', {})
             })
         
         return results
         
     except Exception as e:
-        logger.error(f"Failed to recursively crawl: {e}")
+        logger.error(f"Failed to recursively crawl URLs: {e}")
         return [
             {
                 "url": url,
                 "title": "Failed to crawl",
-                "content": f"Error: {str(e)}",
-                "markdown": None,
-                "text": None,
+                "markdown": f"Error: {str(e)}",
                 "success": False,
-                "content_length": 0,
-                "metadata": {}
             }
             for url in start_urls
         ]
@@ -356,16 +459,15 @@ async def crawl_and_chunk_markdown_tool(
     max_concurrent: int = 10
 ) -> List[dict]:
     """
-    Crawl a markdown page and chunk it by headers.
-    Only available with Crawl4AI backend.
+    Crawl a URL and chunk the markdown content.
     
     Args:
         url: URL to crawl
-        chunk_size: Maximum size per chunk
+        chunk_size: Size of each chunk in characters
         max_concurrent: Maximum concurrent requests
         
     Returns:
-        List of chunks with metadata
+        List of dictionaries with chunked markdown content
     """
     try:
         config = Crawl4AIConfig(
@@ -377,28 +479,31 @@ async def crawl_and_chunk_markdown_tool(
         )
         
         crawler = Crawler(backend="crawl4ai", crawl4ai_config=config)
-        chunks = []
+        chunks = await crawler.acrawl_and_chunk_markdown(url, chunk_size=chunk_size)
         
-        async for chunk in crawler.crawl_and_chunk_markdown(url, chunk_size):
-            chunks.append(chunk)
+        results = []
+        for i, chunk_content in enumerate(chunks):
+            results.append({
+                "url": url,
+                "title": f"Chunk {i+1}",
+                "markdown": chunk_content,
+                "success": True,
+            })
         
-        return chunks
+        return results
         
     except Exception as e:
-        logger.error(f"Failed to crawl and chunk markdown: {e}")
+        logger.error(f"Failed to crawl and chunk {url}: {e}")
         return [
             {
-                'chunk_index': 0,
-                'content': f"Error: {str(e)}",
-                'url': url,
-                'title': "Failed to crawl",
-                'headers': [],
-                'success': False
+                "url": url,
+                "title": "Failed to crawl",
+                "markdown": f"Error: {str(e)}",
+                "success": False,
             }
         ]
 
 
-# Sync wrappers for async tools (for LangGraph compatibility)
 def crawl_recursive_sync_tool(
     start_urls: List[str],
     max_depth: int = 3,
@@ -406,42 +511,23 @@ def crawl_recursive_sync_tool(
     max_concurrent: int = 10
 ) -> List[dict]:
     """
-    Sync wrapper for recursive crawling tool.
+    Synchronous wrapper for recursive crawling.
     
     Args:
-        start_urls: Starting URLs to crawl
-        max_depth: Maximum depth to crawl
-        domain_filter: Optional domain filter for links
+        start_urls: Initial URLs to start crawling from
+        max_depth: Maximum depth to crawl (default: 3)
+        domain_filter: Optional domain filter to limit crawling scope
         max_concurrent: Maximum concurrent requests
         
     Returns:
-        List of dictionaries with crawled content
+        List of dictionaries with essential crawled content
     """
-    try:
-        # Run the async function in a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(
-                crawl_recursive_tool(start_urls, max_depth, domain_filter, max_concurrent)
-            )
-        finally:
-            loop.close()
-    except Exception as e:
-        logger.error(f"Failed to run recursive crawl sync: {e}")
-        return [
-            {
-                "url": url,
-                "title": "Failed to crawl",
-                "content": f"Error: {str(e)}",
-                "markdown": None,
-                "text": None,
-                "success": False,
-                "content_length": 0,
-                "metadata": {}
-            }
-            for url in start_urls
-        ]
+    return asyncio.run(crawl_recursive_tool(
+        start_urls=start_urls,
+        max_depth=max_depth,
+        domain_filter=domain_filter,
+        max_concurrent=max_concurrent
+    ))
 
 
 def crawl_and_chunk_markdown_sync_tool(
@@ -450,49 +536,35 @@ def crawl_and_chunk_markdown_sync_tool(
     max_concurrent: int = 10
 ) -> List[dict]:
     """
-    Sync wrapper for markdown chunking tool.
+    Synchronous wrapper for crawling and chunking markdown.
     
     Args:
         url: URL to crawl
-        chunk_size: Maximum size per chunk
+        chunk_size: Size of each chunk in characters
         max_concurrent: Maximum concurrent requests
         
     Returns:
-        List of chunks with metadata
+        List of dictionaries with chunked markdown content
     """
-    try:
-        # Run the async function in a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(
-                crawl_and_chunk_markdown_tool(url, chunk_size, max_concurrent)
-            )
-        finally:
-            loop.close()
-    except Exception as e:
-        logger.error(f"Failed to run markdown chunking sync: {e}")
-        return [
-            {
-                'chunk_index': 0,
-                'content': f"Error: {str(e)}",
-                'url': url,
-                'title': "Failed to crawl",
-                'headers': [],
-                'success': False
-            }
-        ]
+    return asyncio.run(crawl_and_chunk_markdown_tool(
+        url=url,
+        chunk_size=chunk_size,
+        max_concurrent=max_concurrent
+    ))
 
 
-# Export tools for use by agents
+# Export the main tools that are used by agents
 __all__ = [
     "crawl_tool",
-    "crawl_many_tool", 
-    "crawl_recursive_sync_tool",
-    "crawl_and_chunk_markdown_sync_tool",
-    "acrawl_tool",
+    "crawl_many_tool",
+    # Async versions for advanced usage
+    "acrawl_tool", 
     "acrawl_many_tool",
     "acrawl_many_stream_tool",
     "crawl_recursive_tool",
-    "crawl_and_chunk_markdown_tool"
+    "crawl_and_chunk_markdown_tool",
+    # Sync wrappers
+    "crawl_recursive_sync_tool",
+    "crawl_and_chunk_markdown_sync_tool",
+    "crawl_stream_tool"
 ]

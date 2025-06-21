@@ -4,6 +4,7 @@ Simplified implementation focusing on content extraction only.
 """
 
 import asyncio
+import logging
 import os
 import psutil
 from typing import List, Optional, Dict, Any, AsyncGenerator
@@ -18,9 +19,13 @@ from crawl4ai import (
     CacheMode,
     MemoryAdaptiveDispatcher
 )
+from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+from crawl4ai.content_filter_strategy import BM25ContentFilter, PruningContentFilter
 
 from .readability_extractor import ReadabilityExtractor
 from .article import Article
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,10 +63,30 @@ class Crawl4AIClient:
             extra_args=self.config.extra_browser_args
         )
         
-        # Crawler run configuration
+        # Content filter for token efficiency (prune noise)
+        self.content_filter = PruningContentFilter(
+            threshold=0.48,  # Balanced pruning threshold
+            min_word_threshold=30  # Keep sections with at least 30 words
+        )
+        
+        # Advanced markdown generator with content filtering
+        self.markdown_generator = DefaultMarkdownGenerator(
+            content_source="cleaned_html",  # Use cleaned HTML for better results
+            content_filter=self.content_filter,
+            options={
+                "ignore_links": True,  # Keep links for reference
+                "ignore_images": True,  # Remove images to reduce token usage
+                "escape_html": True,
+                "body_width": 0,  # No line wrapping
+                "skip_internal_links": True,  # Skip internal page anchors
+            }
+        )
+        
+        # Crawler run configuration with advanced markdown generation
         self.crawl_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS if self.config.bypass_cache else CacheMode.ENABLED,
-            stream=False
+            stream=False,
+            markdown_generator=self.markdown_generator
         )
         
         # Memory adaptive dispatcher for parallel crawling
@@ -126,17 +151,41 @@ class Crawl4AIClient:
             content = result.html or ''
             text = result.cleaned_html or ''
         
+        # Handle advanced markdown generation results
+        markdown_content = None
+        if hasattr(result, 'markdown') and result.markdown:
+            # Check if it's a MarkdownGenerationResult object
+            if hasattr(result.markdown, 'fit_markdown') and result.markdown.fit_markdown:
+                # Use fit_markdown for cleaner, filtered content
+                markdown_content = result.markdown.fit_markdown
+            elif hasattr(result.markdown, 'raw_markdown') and result.markdown.raw_markdown:
+                # Fallback to raw markdown
+                markdown_content = result.markdown.raw_markdown
+            elif hasattr(result.markdown, 'markdown_with_citations'):
+                # Use version with citations if available
+                markdown_content = result.markdown.markdown_with_citations
+            else:
+                # If it's a string (older API), use it directly
+                markdown_content = str(result.markdown)
+            
+
+        
         return Article(
             url=result.url,
             title=title,
             content=content,
-            markdown=result.markdown,
+            markdown=markdown_content,
             text=text,
             html=result.html,
             success=True,
             metadata={
                 'links': result.links,
                 'media': result.media,
+                'markdown_info': {
+                    'has_fit_markdown': hasattr(result.markdown, 'fit_markdown') if hasattr(result, 'markdown') else False,
+                    'has_citations': hasattr(result.markdown, 'markdown_with_citations') if hasattr(result, 'markdown') else False,
+                    'content_filtered': self.content_filter is not None
+                },
                 **(result.metadata if hasattr(result, 'metadata') and result.metadata else {})
             }
         )
