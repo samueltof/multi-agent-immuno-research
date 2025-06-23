@@ -34,7 +34,7 @@ class Crawl4AIConfig:
     """Simplified configuration for Crawl4AI crawler."""
     headless: bool = True
     verbose: bool = False
-    max_concurrent: int = 10
+    max_concurrent: int = 5
     memory_threshold_percent: float = 70.0
     check_interval: float = 1.0
     timeout: int = 30
