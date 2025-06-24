@@ -20,8 +20,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from .evaluators import BiomedicalResearcherEvaluator
-from .test_dataset import BIOMEDICAL_TEST_CASES, BiomedicalTestCase, get_test_dataset_summary
+from evals.agents.biomedical_researcher.evaluators import BiomedicalResearcherEvaluator
+from evals.agents.biomedical_researcher.test_dataset_expanded import BIOMEDICAL_TEST_CASES_EXPANDED, BiomedicalTestCase, get_expanded_dataset_summary
 from src.agents.biomedical_researcher import BiomedicalResearcherWrapper
 
 
@@ -182,7 +182,7 @@ class EvaluationRunner:
     ) -> Dict[str, Any]:
         """Run the complete evaluation suite."""
         if test_cases is None:
-            test_cases = BIOMEDICAL_TEST_CASES
+            test_cases = BIOMEDICAL_TEST_CASES_EXPANDED
         
         self.logger.info(f"Starting evaluation suite with {len(test_cases)} test cases")
         
@@ -219,7 +219,7 @@ class EvaluationRunner:
             "evaluation_summary": self.generate_evaluation_summary(successful_results, failed_results),
             "successful_evaluations": successful_results,
             "failed_evaluations": failed_results,
-            "test_dataset_summary": get_test_dataset_summary(),
+            "test_dataset_summary": get_expanded_dataset_summary(),
             "evaluation_config": {
                 "evaluator_model": self.evaluator.model,
                 "agent_config": self.agent_config,
@@ -481,10 +481,10 @@ async def run_quick_evaluation(
 ) -> Dict[str, Any]:
     """Run a quick evaluation on specific test cases."""
     if test_case_ids:
-        test_cases = [case for case in BIOMEDICAL_TEST_CASES if case.id in test_case_ids]
+        test_cases = [case for case in BIOMEDICAL_TEST_CASES_EXPANDED if case.id in test_case_ids]
     else:
         # Run on a subset for quick testing
-        test_cases = BIOMEDICAL_TEST_CASES[:3]
+        test_cases = BIOMEDICAL_TEST_CASES_EXPANDED[:3]
     
     runner = EvaluationRunner(output_dir=output_dir)
     results = await runner.run_evaluation_suite(test_cases)
