@@ -106,12 +106,13 @@ def crawl_many_tool(
         )
 
         crawler = Crawler(backend=backend, crawl4ai_config=config)
+        
+        # Use parallel crawling instead of sequential loop
+        articles = crawler.crawl_many(urls)
         results = []
 
-        for url in urls:
+        for article in articles:
             try:
-                article = crawler.crawl(url)
-
                 # Use fit_markdown if available, otherwise fall back to markdown
                 markdown_content = None
                 if hasattr(article, "markdown") and article.markdown:
@@ -139,11 +140,12 @@ def crawl_many_tool(
                 )
 
             except Exception as e:
-                logger.error(f"Failed to crawl {url}: {e}")
+                logger.error(f"Failed to process crawled article: {e}")
+                # In case of processing error, create failed result
                 results.append(
                     {
-                        "url": url,
-                        "title": "Failed to crawl",
+                        "url": getattr(article, 'url', 'unknown'),
+                        "title": "Failed to process",
                         "markdown": f"Error: {str(e)}",
                         "success": False,
                     }
