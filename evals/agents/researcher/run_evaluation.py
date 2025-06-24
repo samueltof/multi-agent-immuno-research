@@ -57,7 +57,7 @@ def main():
     
     parser.add_argument(
         "--evaluator-model",
-        default="openai:o3-mini",
+        default="openai:o4-mini",
         help="Model to use for LLM-as-a-judge evaluation"
     )
     

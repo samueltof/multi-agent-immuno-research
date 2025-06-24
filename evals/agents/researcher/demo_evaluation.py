@@ -35,7 +35,7 @@ async def demo_single_evaluation():
     # Initialize evaluation runner
     runner = EvaluationRunner(
         output_dir="evals/outputs/researcher/demo",
-        evaluator_model="openai:o3-mini"
+        evaluator_model="openai:o4-mini"
     )
     
     # Run evaluation

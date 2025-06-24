@@ -31,7 +31,7 @@ class EvaluationRunner:
     def __init__(
         self,
         output_dir: str = "evals/outputs/researcher",
-        evaluator_model: str = "openai:o3-mini",
+        evaluator_model: str = "openai:o4-mini",
         agent_config: Optional[Dict[str, Any]] = None
     ):
         self.output_dir = Path(output_dir)
