@@ -232,6 +232,277 @@ Rate the RAG effectiveness on a scale of 0-1:
 Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning.
 """
 
+# Enhanced RAG evaluation prompts based on OpenEvals best practices
+
+FAITHFULNESS_PROMPT = """
+You are an expert evaluator assessing the faithfulness of generated responses to retrieved content.
+
+Your task is to determine whether the generated response is factually grounded in the provided retrieved content, without hallucinations or unsupported claims.
+
+Consider the following criteria:
+- All claims in the response are supported by the retrieved content
+- No fabricated information that doesn't exist in the sources
+- Accurate representation of facts from the retrieved content
+- No contradictions with the source material
+- Proper context preservation from retrieval to generation
+
+Rate the faithfulness on a scale of 0-1:
+- 1.0: All information is fully supported by retrieved content with perfect accuracy
+- 0.8: Mostly faithful with minor unsupported details that don't affect core facts
+- 0.6: Generally faithful but contains some unsupported claims
+- 0.4: Mixed faithfulness with notable unsupported or contradictory information
+- 0.2: Mostly unfaithful with significant hallucinations or fabrications
+- 0.0: Completely unfaithful response with widespread hallucinations
+
+<research_question>
+{inputs}
+</research_question>
+
+<generated_response>
+{outputs}
+</generated_response>
+
+<retrieved_content>
+{context}
+</retrieved_content>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning focusing on specific examples of supported vs unsupported claims.
+"""
+
+CONTEXT_PRECISION_PROMPT = """
+You are an expert evaluator assessing the precision of retrieved content for a research question.
+
+Your task is to determine what fraction of the retrieved content is actually relevant and useful for answering the research question.
+
+Consider the following criteria:
+- Relevance of each piece of retrieved content to the research question
+- Signal-to-noise ratio in the retrieved information
+- Presence of irrelevant or distracting information
+- Quality of content filtering and selection
+- Efficiency of the retrieval process
+
+Rate the context precision on a scale of 0-1:
+- 1.0: All retrieved content is highly relevant and directly useful
+- 0.8: Most content is relevant with minimal irrelevant information
+- 0.6: Good relevance but some irrelevant content included
+- 0.4: Mixed relevance with notable irrelevant content
+- 0.2: Poor precision with mostly irrelevant content
+- 0.0: Retrieved content is largely irrelevant to the question
+
+<research_question>
+{inputs}
+</research_question>
+
+<retrieved_content>
+{context}
+</retrieved_content>
+
+<expected_topics>
+{key_concepts}
+</expected_topics>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning with specific examples of relevant vs irrelevant content.
+"""
+
+CONTEXT_RECALL_PROMPT = """
+You are an expert evaluator assessing the recall of retrieved content for a research question.
+
+Your task is to determine whether the retrieval system successfully found all the important and relevant information needed to comprehensively answer the research question.
+
+Consider the following criteria:
+- Coverage of all major aspects of the research question
+- Inclusion of key facts, figures, and important details
+- Representation of different perspectives or viewpoints where applicable
+- Completeness of retrieved information relative to what should be available
+- Absence of critical information gaps
+
+Rate the context recall on a scale of 0-1:
+- 1.0: All important and relevant information has been successfully retrieved
+- 0.8: Most critical information retrieved with minor gaps
+- 0.6: Good coverage but some important information missing
+- 0.4: Adequate retrieval but notable information gaps
+- 0.2: Poor recall with significant missing information
+- 0.0: Failed to retrieve most of the important relevant information
+
+<research_question>
+{inputs}
+</research_question>
+
+<retrieved_content>
+{context}
+</retrieved_content>
+
+<expected_key_concepts>
+{key_concepts}
+</expected_key_concepts>
+
+<expected_information_types>
+{expected_sources}
+</expected_information_types>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning focusing on what important information is present vs missing.
+"""
+
+# Enhanced RAG Effectiveness prompt with better criteria
+ENHANCED_RAG_EFFECTIVENESS_PROMPT = """
+You are an expert in Retrieval-Augmented Generation (RAG) systems evaluating the end-to-end effectiveness of web-based RAG implementation.
+
+Your task is to assess how effectively the system retrieved relevant web content and used it to generate accurate, comprehensive responses.
+
+Consider the following criteria:
+- **Retrieval Quality**: Relevance and completeness of retrieved web content
+- **Faithfulness**: Accuracy of information extraction and use from retrieved content  
+- **Attribution**: Proper citation and reference to source materials
+- **Synthesis**: Effective integration of multiple retrieved sources
+- **Completeness**: Coverage of the research question using retrieved content
+- **Coherence**: Logical flow and organization of the generated response
+
+Rate the overall RAG effectiveness on a scale of 0-1:
+- 1.0: Excellent RAG implementation - perfect retrieval, faithful generation, complete coverage
+- 0.8: Good RAG performance - effective retrieval and generation with minor issues
+- 0.6: Adequate RAG implementation - reasonable performance but some weaknesses
+- 0.4: Limited RAG effectiveness - notable issues in retrieval or generation quality
+- 0.2: Poor RAG performance - significant problems in multiple aspects
+- 0.0: Failed RAG implementation - system doesn't effectively use retrieved content
+
+<research_question>
+{inputs}
+</research_question>
+
+<generated_response>
+{outputs}
+</generated_response>
+
+<retrieved_content>
+{context}
+</retrieved_content>
+
+<sources_used>
+{sources}
+</sources_used>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning covering each of the six criteria above.
+"""
+
+# Advanced Enhancement Evaluators
+
+TEMPORAL_ACCURACY_PROMPT = """
+You are an expert evaluator assessing the temporal accuracy and currency of information in research responses.
+
+Your task is to determine whether the information provided is current, up-to-date, and appropriate for time-sensitive queries.
+
+Consider the following criteria:
+- Currency of information relative to the research question's time requirements
+- Use of recent data, statistics, and developments when relevant
+- Appropriate handling of time-sensitive topics (current events, recent research, market trends)
+- Clear indication of information recency and temporal context
+- Avoidance of outdated information that could mislead
+
+Rate the temporal accuracy on a scale of 0-1:
+- 1.0: Information is perfectly current and appropriate for the time context
+- 0.8: Mostly current information with minor temporal gaps
+- 0.6: Generally current but some outdated elements present
+- 0.4: Mixed currency with notable outdated information
+- 0.2: Mostly outdated information that affects response quality
+- 0.0: Severely outdated information that undermines response accuracy
+
+<research_question>
+{inputs}
+</research_question>
+
+<generated_response>
+{outputs}
+</generated_response>
+
+<requires_recent_info>
+{requires_recent_info}
+</requires_recent_info>
+
+<source_dates>
+{source_dates}
+</source_dates>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning focusing on the currency and temporal appropriateness of the information.
+"""
+
+BIAS_ASSESSMENT_PROMPT = """
+You are an expert evaluator assessing information bias and perspective balance in research responses.
+
+Your task is to determine whether the response presents balanced perspectives and avoids problematic bias.
+
+Consider the following criteria:
+- Balanced representation of different viewpoints and perspectives
+- Absence of political, cultural, or ideological bias
+- Fair treatment of controversial or disputed topics
+- Acknowledgment of limitations and uncertainties
+- Avoidance of leading language or one-sided presentations
+
+Rate the bias assessment on a scale of 0-1:
+- 1.0: Perfectly balanced and unbiased presentation of information
+- 0.8: Mostly balanced with minor perspective gaps
+- 0.6: Generally balanced but some bias indicators present
+- 0.4: Notable bias affecting information presentation
+- 0.2: Significant bias that distorts information quality
+- 0.0: Severe bias that undermines response credibility
+
+<research_question>
+{inputs}
+</research_question>
+
+<generated_response>
+{outputs}
+</generated_response>
+
+<source_diversity>
+{source_diversity}
+</source_diversity>
+
+<topic_sensitivity>
+{topic_sensitivity}
+</topic_sensitivity>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning focusing on bias indicators and perspective balance.
+"""
+
+FACTUAL_VERIFICATION_PROMPT = """
+You are an expert fact-checker evaluating the factual accuracy and verifiability of claims in research responses.
+
+Your task is to assess whether factual claims can be verified and cross-referenced against authoritative sources.
+
+Consider the following criteria:
+- Accuracy of specific facts, figures, and statistical claims
+- Verifiability of claims against authoritative sources
+- Consistency of information across multiple sources
+- Proper qualification of uncertain or disputed information
+- Absence of factual errors or misrepresentations
+
+Rate the factual verification on a scale of 0-1:
+- 1.0: All factual claims are accurate and fully verifiable
+- 0.8: Mostly accurate facts with minor verification gaps
+- 0.6: Generally accurate but some unverifiable claims
+- 0.4: Mixed accuracy with notable factual concerns
+- 0.2: Significant factual errors affecting response quality
+- 0.0: Widespread factual inaccuracies that undermine credibility
+
+<research_question>
+{inputs}
+</research_question>
+
+<generated_response>
+{outputs}
+</generated_response>
+
+<authoritative_sources>
+{authoritative_sources}
+</authoritative_sources>
+
+<fact_check_context>
+{fact_check_context}
+</fact_check_context>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning focusing on factual accuracy and verifiability of specific claims.
+"""
+
 
 def create_search_quality_evaluator(model: str = "openai:gpt-4o-mini"):
     """Create an evaluator for web search quality."""
@@ -283,18 +554,68 @@ def create_research_completeness_evaluator(model: str = "openai:gpt-4o-mini"):
     )
 
 
-def create_rag_effectiveness_evaluator(model: str = "openai:gpt-4o-mini"):
-    """Create an evaluator for RAG effectiveness."""
+def create_faithfulness_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for response faithfulness to retrieved content."""
     return create_llm_as_judge(
-        prompt=RAG_EFFECTIVENESS_PROMPT,
+        prompt=FAITHFULNESS_PROMPT,
         model=model,
         choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-        feedback_key="rag_effectiveness"
+        feedback_key="faithfulness"
+    )
+
+
+def create_context_precision_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for context precision (relevance of retrieved content)."""
+    return create_llm_as_judge(
+        prompt=CONTEXT_PRECISION_PROMPT,
+        model=model,
+        choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        feedback_key="context_precision"
+    )
+
+
+def create_context_recall_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for context recall (completeness of retrieved content)."""
+    return create_llm_as_judge(
+        prompt=CONTEXT_RECALL_PROMPT,
+        model=model,
+        choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        feedback_key="context_recall"
+    )
+
+
+def create_temporal_accuracy_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for temporal accuracy and information currency."""
+    return create_llm_as_judge(
+        prompt=TEMPORAL_ACCURACY_PROMPT,
+        model=model,
+        choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        feedback_key="temporal_accuracy"
+    )
+
+
+def create_bias_assessment_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for bias detection and perspective balance."""
+    return create_llm_as_judge(
+        prompt=BIAS_ASSESSMENT_PROMPT,
+        model=model,
+        choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        feedback_key="bias_assessment"
+    )
+
+
+def create_factual_verification_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for factual accuracy and verifiability."""
+    return create_llm_as_judge(
+        prompt=FACTUAL_VERIFICATION_PROMPT,
+        model=model,
+        choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        feedback_key="factual_verification"
     )
 
 
 class ResearcherEvaluator:
-    """Comprehensive evaluator for the Web Researcher agent."""
+    """Comprehensive evaluator for the Web Researcher agent with enhanced RAG evaluation."""
     
     def __init__(self, model: str = "openai:gpt-4o-mini"):
         self.model = model
@@ -303,7 +624,24 @@ class ResearcherEvaluator:
         self.information_synthesis_evaluator = create_information_synthesis_evaluator(model)
         self.source_quality_evaluator = create_source_quality_evaluator(model)
         self.research_completeness_evaluator = create_research_completeness_evaluator(model)
-        self.rag_effectiveness_evaluator = create_rag_effectiveness_evaluator(model)
+        
+        # Enhanced RAG evaluators
+        self.faithfulness_evaluator = create_faithfulness_evaluator(model)
+        self.context_precision_evaluator = create_context_precision_evaluator(model)
+        self.context_recall_evaluator = create_context_recall_evaluator(model)
+        
+        # Advanced enhancement evaluators
+        self.temporal_accuracy_evaluator = create_temporal_accuracy_evaluator(model)
+        self.bias_assessment_evaluator = create_bias_assessment_evaluator(model)
+        self.factual_verification_evaluator = create_factual_verification_evaluator(model)
+        
+        # Update RAG effectiveness evaluator with enhanced prompt
+        self.rag_effectiveness_evaluator = create_llm_as_judge(
+            prompt=ENHANCED_RAG_EFFECTIVENESS_PROMPT,
+            model=model,
+            choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+            feedback_key="rag_effectiveness"
+        )
     
     def evaluate_response(
         self,
@@ -334,6 +672,7 @@ class ResearcherEvaluator:
         expected_sources = test_case_info.get("expected_sources", []) if test_case_info else []
         search_keywords = test_case_info.get("search_keywords", []) if test_case_info else []
         key_concepts = test_case_info.get("key_concepts", []) if test_case_info else []
+        requires_recent_info = test_case_info.get("requires_recent_info", False) if test_case_info else False
         
         try:
             # Evaluate search quality
@@ -387,29 +726,111 @@ class ResearcherEvaluator:
         except Exception as e:
             evaluations["research_completeness"] = {"error": str(e)}
         
-        try:
-            # Evaluate RAG effectiveness (if applicable)
-            if crawled_content:
-                evaluations["rag_effectiveness"] = self.rag_effectiveness_evaluator(
+        # Enhanced RAG evaluations
+        if crawled_content:
+            try:
+                # Faithfulness evaluation
+                evaluations["faithfulness"] = self.faithfulness_evaluator(
                     inputs=prompt,
                     outputs=research_content,
                     context=crawled_content
                 )
+            except Exception as e:
+                evaluations["faithfulness"] = {"error": str(e)}
+            
+            try:
+                # Context precision evaluation
+                evaluations["context_precision"] = self.context_precision_evaluator(
+                    inputs=prompt,
+                    context=crawled_content,
+                    key_concepts=", ".join(key_concepts)
+                )
+            except Exception as e:
+                evaluations["context_precision"] = {"error": str(e)}
+            
+            try:
+                # Context recall evaluation
+                evaluations["context_recall"] = self.context_recall_evaluator(
+                    inputs=prompt,
+                    context=crawled_content,
+                    key_concepts=", ".join(key_concepts),
+                    expected_sources=", ".join(expected_sources)
+                )
+            except Exception as e:
+                evaluations["context_recall"] = {"error": str(e)}
+            
+            try:
+                # Enhanced RAG effectiveness evaluation
+                evaluations["rag_effectiveness"] = self.rag_effectiveness_evaluator(
+                    inputs=prompt,
+                    outputs=research_content,
+                    context=crawled_content,
+                    sources=", ".join(sources_used) if isinstance(sources_used, list) else str(sources_used)
+                )
+            except Exception as e:
+                evaluations["rag_effectiveness"] = {"error": str(e)}
+        
+        # Advanced enhancement evaluations
+        try:
+            # Temporal accuracy evaluation
+            source_dates = "Recent sources" if requires_recent_info else "Standard sources"
+            evaluations["temporal_accuracy"] = self.temporal_accuracy_evaluator(
+                inputs=prompt,
+                outputs=research_content,
+                requires_recent_info=str(requires_recent_info),
+                source_dates=source_dates
+            )
         except Exception as e:
-            evaluations["rag_effectiveness"] = {"error": str(e)}
+            evaluations["temporal_accuracy"] = {"error": str(e)}
+        
+        try:
+            # Bias assessment evaluation
+            source_diversity = f"Sources from {len(set(sources_used))} different domains" if sources_used else "Limited source diversity"
+            topic_sensitivity = "Standard research topic"  # Could be enhanced with topic classification
+            evaluations["bias_assessment"] = self.bias_assessment_evaluator(
+                inputs=prompt,
+                outputs=research_content,
+                source_diversity=source_diversity,
+                topic_sensitivity=topic_sensitivity
+            )
+        except Exception as e:
+            evaluations["bias_assessment"] = {"error": str(e)}
+        
+        try:
+            # Factual verification evaluation
+            authoritative_sources = ", ".join(expected_sources) if expected_sources else "General web sources"
+            fact_check_context = f"Research on {', '.join(key_concepts)}" if key_concepts else "General research context"
+            evaluations["factual_verification"] = self.factual_verification_evaluator(
+                inputs=prompt,
+                outputs=research_content,
+                authoritative_sources=authoritative_sources,
+                fact_check_context=fact_check_context
+            )
+        except Exception as e:
+            evaluations["factual_verification"] = {"error": str(e)}
         
         return evaluations
     
     def calculate_overall_score(self, evaluations: Dict[str, EvaluatorResult]) -> float:
-        """Calculate an overall score from individual evaluation results."""
-        scores = []
+        """Calculate an overall score from individual evaluation results with enhanced weighting."""
         weights = {
-            "search_quality": 0.20,
-            "crawling_quality": 0.15,
-            "information_synthesis": 0.25,
-            "source_quality": 0.20,
-            "research_completeness": 0.20,
-            "rag_effectiveness": 0.10  # Lower weight as it's not always applicable
+            # Core web research capabilities
+            "search_quality": 0.10,
+            "crawling_quality": 0.08,
+            "information_synthesis": 0.12,
+            "source_quality": 0.10,
+            "research_completeness": 0.12,
+            
+            # Enhanced RAG-specific metrics
+            "faithfulness": 0.15,  # Critical for factual accuracy
+            "context_precision": 0.05,  # Quality of retrieval
+            "context_recall": 0.05,    # Completeness of retrieval
+            "rag_effectiveness": 0.05,   # Overall RAG performance
+            
+            # Advanced enhancement metrics
+            "temporal_accuracy": 0.08,    # Information currency
+            "bias_assessment": 0.05,      # Perspective balance
+            "factual_verification": 0.05  # Fact checking
         }
         
         total_weight = 0.0
@@ -419,40 +840,9 @@ class ResearcherEvaluator:
             if isinstance(result, dict) and "error" not in result:
                 score = result.get("score", 0.0)
                 if isinstance(score, (int, float)):
-                    weight = weights.get(metric, 0.1)
+                    weight = weights.get(metric, 0.01)  # Small default weight for unexpected metrics
                     weighted_sum += score * weight
                     total_weight += weight
         
         # Normalize by actual total weight to handle missing evaluations
-        return weighted_sum / total_weight if total_weight > 0 else 0.0
-    
-    def evaluate_rag_components(
-        self,
-        prompt: str,
-        retrieved_content: str,
-        generated_response: str
-    ) -> Dict[str, EvaluatorResult]:
-        """
-        Specifically evaluate RAG components (retrieval and generation).
-        
-        Args:
-            prompt: The original research question
-            retrieved_content: Content retrieved from web sources
-            generated_response: Final generated response
-        
-        Returns:
-            Dictionary of RAG-specific evaluation results
-        """
-        evaluations = {}
-        
-        try:
-            # Evaluate RAG effectiveness
-            evaluations["rag_effectiveness"] = self.rag_effectiveness_evaluator(
-                inputs=prompt,
-                outputs=generated_response,
-                context=retrieved_content
-            )
-        except Exception as e:
-            evaluations["rag_effectiveness"] = {"error": str(e)}
-        
-        return evaluations 
+        return weighted_sum / total_weight if total_weight > 0 else 0.0 

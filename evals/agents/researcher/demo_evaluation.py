@@ -114,17 +114,69 @@ def demo_rag_evaluation():
     print(f"Retrieved content: {retrieved_content[:100]}...")
     print(f"Generated response: {generated_response[:100]}...")
     
-    # Run RAG evaluation
-    rag_results = evaluator.evaluate_rag_components(
+    # Create mock response for evaluation
+    mock_response = {
+        "content": generated_response,
+        "sources": ["https://example.com/quantum-news"],
+        "search_info": "Searched for quantum computing developments 2024",
+        "crawled_content": retrieved_content
+    }
+    
+    # Create mock test case info
+    test_case_info = {
+        "expected_sources": ["quantum computing news"],
+        "search_keywords": ["quantum computing", "2024", "developments"],
+        "key_concepts": ["quantum processor", "error correction", "networking"]
+    }
+    
+    # Run comprehensive RAG evaluation using the main evaluate_response method
+    rag_results = evaluator.evaluate_response(
         prompt=prompt,
-        retrieved_content=retrieved_content,
-        generated_response=generated_response
+        response=mock_response,
+        test_case_info=test_case_info
     )
     
-    print("\nRAG Evaluation Results:")
-    for metric, result in rag_results.items():
-        print(f"  {metric}: {result.get('score', 'Error'):.2f}")
-        print(f"    {result.get('comment', 'No comment')[:80]}...")
+    print("\nCore RAG Evaluation Results:")
+    # Focus on core RAG-specific metrics
+    core_rag_metrics = ["faithfulness", "context_precision", "context_recall", "rag_effectiveness"]
+    for metric in core_rag_metrics:
+        if metric in rag_results:
+            result = rag_results[metric]
+            if isinstance(result, dict) and "score" in result:
+                print(f"  {metric}: {result.get('score', 'Error'):.2f}")
+                print(f"    {result.get('comment', 'No comment')[:80]}...")
+            else:
+                print(f"  {metric}: Error - {result}")
+    
+    print("\nAdvanced Enhancement Metrics:")
+    # Show new enhancement metrics
+    enhancement_metrics = ["temporal_accuracy", "bias_assessment", "factual_verification"]
+    for metric in enhancement_metrics:
+        if metric in rag_results:
+            result = rag_results[metric]
+            if isinstance(result, dict) and "score" in result:
+                print(f"  {metric}: {result.get('score', 'Error'):.2f}")
+                print(f"    {result.get('comment', 'No comment')[:80]}...")
+            else:
+                print(f"  {metric}: Error - {result}")
+    
+    # Also show other metrics for context
+    print("\nCore Web Research Metrics:")
+    other_metrics = ["search_quality", "information_synthesis", "source_quality"]
+    for metric in other_metrics:
+        if metric in rag_results:
+            result = rag_results[metric]
+            if isinstance(result, dict) and "score" in result:
+                print(f"  {metric}: {result.get('score', 'Error'):.2f}")
+            else:
+                print(f"  {metric}: Error - {result}")
+    
+    # Calculate and show overall score
+    overall_score = evaluator.calculate_overall_score(rag_results)
+    print(f"\nOverall Weighted Score: {overall_score:.3f}")
+    print("(Based on enhanced weighting system with new metrics)")
+    
+    print("\n" + "="*80)
 
 
 async def demo_comparative_analysis():

@@ -36,6 +36,12 @@ from .evaluators import (
     create_information_synthesis_evaluator,
     create_source_quality_evaluator,
     create_research_completeness_evaluator,
+    create_faithfulness_evaluator,
+    create_context_precision_evaluator,
+    create_context_recall_evaluator,
+    create_temporal_accuracy_evaluator,
+    create_bias_assessment_evaluator,
+    create_factual_verification_evaluator,
 )
 
 from .evaluation_runner import (
@@ -61,6 +67,12 @@ __all__ = [
     "create_information_synthesis_evaluator",
     "create_source_quality_evaluator",
     "create_research_completeness_evaluator",
+    "create_faithfulness_evaluator",
+    "create_context_precision_evaluator",
+    "create_context_recall_evaluator",
+    "create_temporal_accuracy_evaluator",
+    "create_bias_assessment_evaluator",
+    "create_factual_verification_evaluator",
     
     # Evaluation runner
     "EvaluationRunner",

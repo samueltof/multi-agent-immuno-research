@@ -98,10 +98,10 @@ def main():
     print("\n" + "="*80)
     print("EVALUATION COMPLETED")
     print("="*80)
-    print(f"Total test cases: {result['total_test_cases']}")
-    print(f"Successful: {result['successful_evaluations']}")
-    print(f"Failed: {result['failed_evaluations']}")
-    print(f"Overall score: {result['summary']['overall_score']:.2f}")
+    print(f"Total test cases: {result['summary']['total_cases']}")
+    print(f"Successful: {result['summary']['successful_cases']}")
+    print(f"Failed: {result['summary']['failed_cases']}")
+    print(f"Overall score: {result['summary']['average_score']:.3f}")
     print(f"Results saved to: {args.output_dir}")
 
 
