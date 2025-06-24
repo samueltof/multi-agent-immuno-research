@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 import psutil
+import logging
 from typing import List, Optional, Dict, Any, AsyncGenerator
 from dataclasses import dataclass, field
 from urllib.parse import urldefrag
@@ -48,7 +49,7 @@ class Crawl4AIConfig:
     
     # LLM Content Filtering Options (DEFAULT: ENABLED)
     use_llm_filter: bool = True  # Default to LLM filtering for better quality
-    llm_provider: str = "openai/gpt-4o-mini"  # More cost-effective option
+    llm_provider: str = "openai/gpt-4.1-nano"  # Ultra-fast and cost-effective option
     llm_api_token: Optional[str] = None  # Will use environment variable if None
     llm_filter_instruction: Optional[str] = None  # Custom instruction for LLM filtering
     chunk_token_threshold: int = 4096  # Token threshold for chunking
@@ -67,9 +68,10 @@ class Crawl4AIClient:
         
         # Browser configuration optimized for performance
         self.browser_config = BrowserConfig(
+            browser_type="chromium",  # Standard browser type
             headless=self.config.headless,
-            verbose=self.config.verbose,
-            extra_args=self.config.extra_browser_args
+            verbose=self.config.verbose
+            # Note: extra browser args are handled via browser startup flags
         )
         
         # Content filter setup - choose between Pruning and LLM filtering
@@ -149,7 +151,10 @@ class Crawl4AIClient:
         self.crawl_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS if self.config.bypass_cache else CacheMode.ENABLED,
             stream=False,
-            markdown_generator=self.markdown_generator
+            markdown_generator=self.markdown_generator,
+            # Add timeout configuration
+            page_timeout=self.config.timeout * 1000,  # Convert to milliseconds
+            verbose=self.config.verbose
         )
         
         # Memory adaptive dispatcher for parallel crawling
