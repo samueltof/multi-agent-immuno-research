@@ -80,9 +80,9 @@ def get_llm_by_type(llm_type: LLMType) -> ChatOpenAI | ChatDeepSeek:
                 api_key=REASONING_API_KEY,
             )
         else:
-            # For OpenAI reasoning models (o1, o3 series), don't set temperature
+            # For OpenAI reasoning models (o1, o3, o4 series), don't set temperature
             # as they don't support custom temperature values
-            if REASONING_MODEL and (REASONING_MODEL.startswith('o1') or REASONING_MODEL.startswith('o3')):
+            if REASONING_MODEL and (REASONING_MODEL.startswith('o1') or REASONING_MODEL.startswith('o3') or REASONING_MODEL.startswith('o4')):
                 # Create without temperature parameter for reasoning models
                 llm_kwargs = {"model": REASONING_MODEL}
                 if REASONING_BASE_URL:

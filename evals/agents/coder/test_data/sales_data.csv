@@ -1,0 +1,31 @@
+date,product_category,units_sold,revenue,region
+2024-01-15,Electronics,120,24000,North
+2024-01-20,Clothing,85,4250,South
+2024-01-25,Home & Garden,65,3250,West
+2024-02-01,Electronics,145,29000,East
+2024-02-05,Books,95,1425,North
+2024-02-10,Clothing,110,5500,South
+2024-02-15,Sports,75,3750,West
+2024-02-20,Electronics,130,26000,North
+2024-03-01,Home & Garden,90,4500,East
+2024-03-05,Clothing,125,6250,South
+2024-03-10,Books,80,1200,West
+2024-03-15,Sports,95,4750,North
+2024-03-20,Electronics,160,32000,East
+2024-03-25,Home & Garden,105,5250,South
+2024-04-01,Clothing,140,7000,West
+2024-04-05,Books,70,1050,North
+2024-04-10,Sports,85,4250,East
+2024-04-15,Electronics,175,35000,South
+2024-04-20,Home & Garden,115,5750,West
+2024-04-25,Clothing,155,7750,North
+2024-05-01,Books,90,1350,East
+2024-05-05,Sports,100,5000,South
+2024-05-10,Electronics,190,38000,West
+2024-05-15,Home & Garden,125,6250,North
+2024-05-20,Clothing,170,8500,East
+2024-05-25,Books,85,1275,South
+2024-06-01,Sports,110,5500,West
+2024-06-05,Electronics,200,40000,North
+2024-06-10,Home & Garden,135,6750,East
+2024-06-15,Clothing,180,9000,South 

@@ -21,6 +21,21 @@ def inject_plot_saving_code(code: str) -> str:
     plot_commands = ['plt.show()', 'plt.plot(', 'plt.bar(', 'plt.scatter(', 'plt.hist(', 'plt.barh(']
     
     if any(cmd in code for cmd in plot_commands):
+        # Check if the code already contains explicit plt.savefig() calls
+        if 'plt.savefig(' in code:
+            # Code already has explicit saving, don't inject automatic saving
+            # Just ensure proper backend setup if needed
+            if 'matplotlib.pyplot' in code or 'import matplotlib' in code:
+                if 'matplotlib.use(' not in code:
+                    backend_code = '''
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+'''
+                    # Add backend setting at the beginning if not already present
+                    code = backend_code + code
+            return code
+        
+        # No explicit saving found, proceed with automatic injection
         # Generate a unique filename
         import uuid
         from datetime import datetime
@@ -94,7 +109,7 @@ def python_repl_tool(
         if plot_paths:
             result_str += f"\n\nPlots generated:\n"
             for plot_path in plot_paths:
-                result_str += f"- {plot_path}\n"
+                result_str += f"PLOT_SAVED: {plot_path}\n"
         
         return result_str
         
