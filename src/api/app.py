@@ -1,5 +1,5 @@
 """
-FastAPI application for LangManus.
+FastAPI application.
 """
 
 import json
