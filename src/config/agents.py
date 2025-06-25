@@ -9,7 +9,7 @@ AGENT_LLM_MAP: dict[str, LLMType] = {
     "planner": "reasoning", 
     "supervisor": "basic", 
     "researcher": "basic", 
-    "coder": "basic", 
+    "coder": "reasoning", 
     "browser": "vision", 
     "reporter": "basic", 
     "data_analyst": "reasoning",
