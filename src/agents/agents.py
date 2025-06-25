@@ -46,8 +46,15 @@ browser_agent = create_react_agent(
     prompt=lambda state: apply_prompt_template("browser", state),
 )
 
-# Create the data analyst as a custom workflow agent
-data_analyst_workflow = create_data_team_graph(get_llm_by_type(AGENT_LLM_MAP["data_analyst"]))
+# Create the data analyst as a custom workflow agent (lazy initialization)
+_data_analyst_workflow = None
+
+def get_data_analyst_workflow():
+    """Get data analyst workflow with lazy initialization"""
+    global _data_analyst_workflow
+    if _data_analyst_workflow is None:
+        _data_analyst_workflow = create_data_team_graph(get_llm_by_type(AGENT_LLM_MAP["data_analyst"]))
+    return _data_analyst_workflow
 
 def data_analyst_agent(state):
     """
@@ -68,7 +75,7 @@ def data_analyst_agent(state):
     }
     
     # Run the data team workflow
-    result = data_analyst_workflow.invoke(workflow_input)
+    result = get_data_analyst_workflow().invoke(workflow_input)
     
     # Return the result in the expected format
     return result

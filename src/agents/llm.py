@@ -65,6 +65,30 @@ def create_deepseek_llm(
 _llm_cache: dict[LLMType, ChatOpenAI | ChatDeepSeek] = {}
 
 
+def clear_llm_cache() -> None:
+    """
+    Clear the LLM cache. Useful when configuration changes or for testing.
+    """
+    global _llm_cache
+    cache_keys = list(_llm_cache.keys())
+    _llm_cache.clear()
+    print(f"✅ LLM cache cleared! Removed: {cache_keys}")
+
+
+def get_cache_status() -> dict:
+    """
+    Get the current status of the LLM cache.
+    """
+    status = {}
+    for key, llm in _llm_cache.items():
+        model_name = getattr(llm, 'model_name', getattr(llm, 'model', 'unknown'))
+        status[key] = {
+            'type': type(llm).__name__,
+            'model': model_name
+        }
+    return status
+
+
 def get_llm_by_type(llm_type: LLMType) -> ChatOpenAI | ChatDeepSeek:
     """
     Get LLM instance by type. Returns cached instance if available.
@@ -115,10 +139,41 @@ def get_llm_by_type(llm_type: LLMType) -> ChatOpenAI | ChatDeepSeek:
     return llm
 
 
-# Initialize LLMs for different purposes - now these will be cached
-reasoning_llm = get_llm_by_type("reasoning")
-basic_llm = get_llm_by_type("basic")
-vl_llm = get_llm_by_type("vision")
+# LLMs will be lazily initialized when first requested via get_llm_by_type()
+# This avoids premature caching with potentially incorrect configuration
+
+def get_reasoning_llm():
+    """Get reasoning LLM instance (lazy initialization)"""
+    return get_llm_by_type("reasoning")
+
+def get_basic_llm():
+    """Get basic LLM instance (lazy initialization)"""
+    return get_llm_by_type("basic")
+
+def get_vl_llm():
+    """Get vision-language LLM instance (lazy initialization)"""
+    return get_llm_by_type("vision")
+
+# For backward compatibility with existing code that imports these directly
+# These will only be initialized when first accessed
+class LazyLLM:
+    def __init__(self, llm_type):
+        self._llm_type = llm_type
+        self._llm = None
+    
+    def __getattr__(self, name):
+        if self._llm is None:
+            self._llm = get_llm_by_type(self._llm_type)
+        return getattr(self._llm, name)
+    
+    def __call__(self, *args, **kwargs):
+        if self._llm is None:
+            self._llm = get_llm_by_type(self._llm_type)
+        return self._llm(*args, **kwargs)
+
+reasoning_llm = LazyLLM("reasoning")
+basic_llm = LazyLLM("basic")
+vl_llm = LazyLLM("vision")
 
 
 if __name__ == "__main__":
