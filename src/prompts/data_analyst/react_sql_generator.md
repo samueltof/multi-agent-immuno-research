@@ -24,17 +24,37 @@ Analyze the user's query:
 
 ## Query Guidelines
 
+### Basic Requirements
 - Do not under any circumstance use SELECT * in your query.
 - Use the relevant columns in the SELECT statement
-- Use appropriate JOIN conditions
+- Use appropriate JOIN conditions when working with multiple tables
 - Include WHERE clauses to filter relevant data
 - Order results meaningfully when appropriate
 - Handle NULL values appropriately (SKIP ALL ROWS WHERE ANY COLUMN IS NULL or "N/A" or "")
 - Use UNION ALL when using multiple datasets
+
+### Aggregation Query Requirements
+- Always use proper GROUP BY clauses with aggregate functions
+- Include appropriate aggregate functions (COUNT, SUM, AVG, MIN, MAX)
+- For multi-table aggregations, ensure proper JOIN conditions
+- Use HAVING clause for filtering aggregated results when needed
+- Handle potential division by zero cases in calculations
+
+### Join Query Requirements
+- Use explicit JOIN syntax (INNER JOIN, LEFT JOIN) rather than WHERE clause joins
+- Ensure all foreign key relationships are properly handled
+- For tables with multiple foreign keys (like complexes table), consider both relationships
+- Use table aliases for clarity in complex joins
+
+### Data Quality Handling
+- Add WHERE clauses to exclude NULL, empty string, or "N/A" values
+- For aggregations, use appropriate NULL handling (e.g., WHERE column IS NOT NULL)
+- Consider data type consistency in comparisons
 
 ## Database Schema
 
 Use these exact table and column names:
 <<DATABASE_SCHEMA>>
 
+## Retry Feedback (if applicable)
 <<RETRY_FEEDBACK>> 

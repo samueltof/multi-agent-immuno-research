@@ -293,23 +293,63 @@ def handle_error_node(state: DataTeamState) -> Dict[str, Any]:
     logger.warning(f"👨‍💻 DATA TEAM: Handling error: {error_msg}")
     return {"error_message": error_msg}
 
-def format_final_response_node(state: DataTeamState) -> Dict[str, Any]:
-    """Formats the final response message."""
-    logger.info("👨‍💻 DATA TEAM: Formatting final response...")
+def format_final_response_node(state: DataTeamState, llm_client: Any) -> Dict[str, Any]:
+    """Formats the final response message using LLM-powered formatting for better presentation."""
+    logger.info("👨‍💻 DATA TEAM: Formatting final response with LLM...")
     
     error_message = state.get("error_message")
     execution_result = state.get("execution_result")
     provided_schema_text = state.get("provided_schema_text")
     query = state.get("natural_language_query", "your query")
+    generated_sql = state.get("generated_sql", "")
     
+    # Determine query type for the formatter
     if provided_schema_text:
-        final_message_content = f"Here is the database schema you requested:\n\n{provided_schema_text}"
+        query_type = "schema_request"
+        raw_results = provided_schema_text
     elif error_message:
-        final_message_content = f"I encountered an error while processing '{query}': {error_message}"
+        query_type = "error"
+        raw_results = ""
     elif execution_result:
-        final_message_content = f"Here are the results for '{query}':\n\n{execution_result}"
+        query_type = "data_query"
+        raw_results = execution_result
     else:
-        final_message_content = f"I processed '{query}' but couldn't validate or execute the SQL query. Validation feedback: {state.get('validation_feedback', 'No specific feedback available.')}"
+        query_type = "validation_failure"
+        raw_results = f"Validation feedback: {state.get('validation_feedback', 'No specific feedback available.')}"
+    
+    # Prepare template variables for response formatting
+    template_vars = {
+        "USER_QUERY": query,
+        "QUERY_TYPE": query_type,
+        "RAW_RESULTS": raw_results,
+        "GENERATED_SQL": generated_sql,
+        "ERROR_MESSAGE": error_message or ""
+    }
+    
+    # Generate the formatting prompt using the workflow template
+    try:
+        formatting_prompt = apply_workflow_prompt_template(
+            "data_analyst", 
+            "response_formatter", 
+            template_vars
+        )
+        
+        # Use LLM to format the response
+        formatted_response = llm_client.invoke([HumanMessage(content=formatting_prompt)])
+        final_message_content = formatted_response.content
+        logger.info("👨‍💻 DATA TEAM: Response formatted successfully using LLM")
+        
+    except Exception as e:
+        # Fallback to simple formatting if LLM formatting fails
+        logger.warning(f"👨‍💻 DATA TEAM: LLM formatting failed, using fallback: {e}")
+        if provided_schema_text:
+            final_message_content = f"Here is the database schema you requested:\n\n{provided_schema_text}"
+        elif error_message:
+            final_message_content = f"I encountered an error while processing '{query}': {error_message}"
+        elif execution_result:
+            final_message_content = f"Here are the results for '{query}':\n\n{execution_result}"
+        else:
+            final_message_content = f"I processed '{query}' but couldn't validate or execute the SQL query. Validation feedback: {state.get('validation_feedback', 'No specific feedback available.')}"
 
     final_message = AIMessage(content=final_message_content, name="data_analyst")
     
@@ -381,8 +421,9 @@ def create_data_team_graph(config=None):
     # Note: get_database_schema removed since we get it automatically in get_schema_node
     sql_generating_agent = create_react_agent(llm_client, tools=[get_random_subsamples])
     
-    # Bind the llm_client to the validation node
+    # Bind the llm_client to the validation and formatting nodes
     validate_sql_with_llm = partial(sql_validator_node, llm_client=llm_client)
+    format_response_with_llm = partial(format_final_response_node, llm_client=llm_client)
 
     # Add nodes
     workflow.add_node("get_schema", get_schema_node)
@@ -392,7 +433,7 @@ def create_data_team_graph(config=None):
     workflow.add_node("validate_sql", validate_sql_with_llm)
     workflow.add_node("execute_sql", sql_executor_node)
     workflow.add_node("handle_error", handle_error_node)
-    workflow.add_node("format_response", format_final_response_node)
+    workflow.add_node("format_response", format_response_with_llm)
 
     # Helper node to increment retry counter
     workflow.add_node("increment_retry", lambda state: {
