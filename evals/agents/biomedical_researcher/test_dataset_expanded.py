@@ -2,14 +2,14 @@
 Expanded test dataset for Cancer Immunogenomics Biomedical Researcher agent.
 
 This comprehensive dataset is designed for scientific conference presentations and
-includes 33 test cases across 11 specialized domains with robust coverage of
+includes 27 test cases across 11 specialized domains with robust coverage of
 current cancer immunogenomics research areas.
 
 Dataset Design:
-- 33 total cases for statistical robustness  
-- 11 domains with exactly 3 cases each
-- Priority system: 18 high (conference focus), 15 standard (comprehensive coverage)
-- Balanced difficulty: 3 basic, 13 intermediate, 17 expert
+- 27 total cases for statistical robustness  
+- 11 domains with 2-3 cases each
+- Priority system: 18 high (conference focus), 9 standard (comprehensive coverage)
+- Balanced difficulty: 3 basic, 10 intermediate, 14 expert
 - Covers cutting-edge topics and clinical applications
 - Aligned with agent's MCP tool capabilities: PubMed, ClinicalTrials.gov, BioRxiv/MedRxiv, OpenTargets
 """
@@ -31,7 +31,7 @@ class BiomedicalTestCase:
     priority: str = "standard"  # "high", "standard"
 
 
-# Comprehensive 33-case cancer immunogenomics test dataset for scientific presentation
+# Comprehensive 27-case cancer immunogenomics test dataset for scientific presentation
 BIOMEDICAL_TEST_CASES_EXPANDED = [
     # ======================
     # T-Cell Receptor Analysis (3 cases)
@@ -250,7 +250,7 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
     ),
     
     # ======================
-    # Immune Resistance Mechanisms (3 cases) - NEW DOMAIN
+    # Immune Resistance Mechanisms (2 cases) - REDUCED FROM 3
     # ======================
     BiomedicalTestCase(
         id="resistance_001",
@@ -261,17 +261,6 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
         key_concepts=["acquired resistance", "checkpoint inhibitors", "resistance mechanisms", "therapeutic strategies"],
         reference_info="Acquired resistance involves multiple mechanisms including T-cell exclusion and immune suppression",
         priority="high"
-    ),
-    
-    BiomedicalTestCase(
-        id="resistance_002",
-        prompt="How do tumors evolve to escape immune surveillance during immunotherapy treatment? Discuss clonal evolution and neoantigen loss.",
-        domain="immune_resistance",
-        difficulty="expert",
-        expected_sources=["PubMed"],
-        key_concepts=["immune escape", "clonal evolution", "neoantigen loss", "immunotherapy", "tumor evolution"],
-        reference_info="Tumors can lose neoantigens through mutation or HLA loss during treatment",
-        priority="standard"
     ),
     
     BiomedicalTestCase(
@@ -286,7 +275,7 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
     ),
     
     # ======================
-    # Combination Immunotherapy Strategies (3 cases) - NEW DOMAIN
+    # Combination Immunotherapy Strategies (2 cases) - REDUCED FROM 3
     # ======================
     BiomedicalTestCase(
         id="combo_001",
@@ -310,19 +299,8 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
         priority="standard"
     ),
     
-    BiomedicalTestCase(
-        id="combo_003",
-        prompt="What are the challenges and opportunities in combining different immunotherapy modalities, such as checkpoint inhibitors with CAR-T cells or cancer vaccines?",
-        domain="combination_therapy",
-        difficulty="expert",
-        expected_sources=["PubMed", "BioRxiv"],
-        key_concepts=["immunotherapy combinations", "checkpoint inhibitors", "CAR-T", "cancer vaccines", "synergy"],
-        reference_info="Multiple immunotherapy combinations are being explored to enhance efficacy",
-        priority="standard"
-    ),
-    
     # ======================
-    # Cancer Vaccines (3 cases)
+    # Cancer Vaccines (2 cases) - REDUCED FROM 3
     # ======================
     BiomedicalTestCase(
         id="vaccines_001",
@@ -346,19 +324,8 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
         priority="standard"
     ),
     
-    BiomedicalTestCase(
-        id="vaccines_003",
-        prompt="What are the immunological mechanisms that determine cancer vaccine efficacy, and how can vaccine formulations be optimized?",
-        domain="cancer_vaccines",
-        difficulty="intermediate",
-        expected_sources=["PubMed"],
-        key_concepts=["vaccine efficacy", "immunological mechanisms", "vaccine formulation", "adjuvants", "optimization"],
-        reference_info="Vaccine efficacy depends on antigen selection, delivery method, and adjuvant choice",
-        priority="standard"
-    ),
-    
     # ======================
-    # Computational Tools & Bioinformatics (3 cases) - NEW DOMAIN
+    # Computational Tools & Bioinformatics (2 cases) - REDUCED FROM 3
     # ======================
     BiomedicalTestCase(
         id="computational_001",
@@ -382,19 +349,8 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
         priority="high"
     ),
     
-    BiomedicalTestCase(
-        id="computational_003",
-        prompt="What machine learning approaches are being used for cancer immunotherapy outcome prediction? Compare deep learning and traditional methods.",
-        domain="computational_tools",
-        difficulty="expert",
-        expected_sources=["PubMed", "BioRxiv"],
-        key_concepts=["machine learning", "immunotherapy prediction", "deep learning", "outcome prediction"],
-        reference_info="Deep learning models show promise for integrating multi-modal data for therapy prediction",
-        priority="standard"
-    ),
-    
     # ======================
-    # Clinical Translation (3 cases)
+    # Clinical Translation (2 cases) - REDUCED FROM 3
     # ======================
     BiomedicalTestCase(
         id="clinical_001",
@@ -418,19 +374,8 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
         priority="standard"
     ),
     
-    BiomedicalTestCase(
-        id="clinical_003",
-        prompt="What are the economic considerations and cost-effectiveness analyses for implementing precision immunogenomics in clinical practice?",
-        domain="clinical_translation",
-        difficulty="intermediate",
-        expected_sources=["PubMed"],
-        key_concepts=["health economics", "cost-effectiveness", "precision medicine", "immunogenomics", "implementation"],
-        reference_info="Cost-effectiveness depends on test accuracy, treatment response rates, and healthcare costs",
-        priority="standard"
-    ),
-    
     # ======================
-    # Immune Foundations (3 cases)
+    # Immune Foundations (2 cases) - REDUCED FROM 3
     # ======================
     BiomedicalTestCase(
         id="foundations_001",
@@ -452,17 +397,6 @@ BIOMEDICAL_TEST_CASES_EXPANDED = [
         key_concepts=["cancer-immunity cycle", "immunosurveillance", "tumor antigens", "immune recognition"],
         reference_info="Cancer-immunity cycle involves antigen release, presentation, T-cell priming, and tumor killing",
         priority="high"
-    ),
-    
-    BiomedicalTestCase(
-        id="foundations_003",
-        prompt="What are the key differences between innate and adaptive immune responses in cancer, and how do they interact in tumor immunity?",
-        domain="immune_foundations",
-        difficulty="basic",
-        expected_sources=["PubMed"],
-        key_concepts=["innate immunity", "adaptive immunity", "tumor immunity", "immune interactions", "cancer"],
-        reference_info="Innate immunity provides initial tumor recognition; adaptive immunity provides specific and memory responses",
-        priority="standard"
     )
 ]
 

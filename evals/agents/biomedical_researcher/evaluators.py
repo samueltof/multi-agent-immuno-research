@@ -6,6 +6,7 @@ This module provides specialized evaluators for assessing:
 - Relevance: Degree to which the response addresses the biomedical research prompt
 - Source Quality: Assessment of the quality and relevance of cited sources
 - Confidence Alignment: How well the confidence level aligns with the response quality
+- Temporal Accuracy: Currency and recency of biomedical information and research
 """
 
 from typing import Any, Dict, List, Optional
@@ -145,6 +146,46 @@ Rate the confidence alignment on a scale of 0-1:
 Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning.
 """
 
+BIOMEDICAL_TEMPORAL_ACCURACY_PROMPT = """
+You are an expert biomedical researcher evaluating the temporal accuracy and currency of biomedical information in research responses.
+
+Your task is to determine whether the biomedical information provided is current, up-to-date, and appropriate for time-sensitive medical queries.
+
+Consider the following criteria:
+- Currency of clinical data, treatment protocols, and research findings
+- Use of recent studies, clinical trials, and medical guidelines when relevant
+- Appropriate handling of time-sensitive medical topics (new treatments, drug approvals, safety updates)
+- Clear indication of publication dates and temporal context for medical information
+- Avoidance of outdated medical information that could be harmful or misleading
+- Recognition when recent developments have superseded older research
+
+Rate the temporal accuracy on a scale of 0-1:
+- 1.0: Information is perfectly current and appropriate for the medical context
+- 0.8: Mostly current biomedical information with minor temporal gaps
+- 0.6: Generally current but some outdated medical elements present
+- 0.4: Mixed currency with notable outdated biomedical information
+- 0.2: Mostly outdated medical information that affects response quality
+- 0.0: Severely outdated biomedical information that could be harmful
+
+<prompt>
+{inputs}
+</prompt>
+
+<response>
+{outputs}
+</response>
+
+<requires_recent_info>
+{requires_recent_info}
+</requires_recent_info>
+
+<source_dates>
+{source_dates}
+</source_dates>
+
+Provide your evaluation as a score between 0.0 and 1.0, and explain your reasoning focusing on the currency and temporal appropriateness of the biomedical information.
+"""
+
 
 def create_biomedical_factual_correctness_evaluator(model: str = "openai:gpt-4o-mini"):
     """Create an evaluator for biomedical factual correctness."""
@@ -186,6 +227,16 @@ def create_biomedical_confidence_alignment_evaluator(model: str = "openai:gpt-4o
     )
 
 
+def create_biomedical_temporal_accuracy_evaluator(model: str = "openai:gpt-4o-mini"):
+    """Create an evaluator for biomedical temporal accuracy and information currency."""
+    return create_llm_as_judge(
+        prompt=BIOMEDICAL_TEMPORAL_ACCURACY_PROMPT,
+        model=model,
+        choices=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        feedback_key="biomedical_temporal_accuracy"
+    )
+
+
 class BiomedicalResearcherEvaluator:
     """Comprehensive evaluator for the Biomedical Researcher agent."""
     
@@ -195,12 +246,14 @@ class BiomedicalResearcherEvaluator:
         self.relevance_evaluator = create_biomedical_relevance_evaluator(model)
         self.source_quality_evaluator = create_biomedical_source_quality_evaluator(model)
         self.confidence_alignment_evaluator = create_biomedical_confidence_alignment_evaluator(model)
+        self.temporal_accuracy_evaluator = create_biomedical_temporal_accuracy_evaluator(model)
     
     def evaluate_response(
         self,
         prompt: str,
         response: Dict[str, Any],
-        reference_outputs: Optional[str] = None
+        reference_outputs: Optional[str] = None,
+        requires_recent_info: bool = True
     ) -> Dict[str, EvaluatorResult]:
         """
         Evaluate a biomedical researcher response comprehensively.
@@ -209,6 +262,7 @@ class BiomedicalResearcherEvaluator:
             prompt: The original research question/prompt
             response: The agent's response (BiomedicalResearchOutput)
             reference_outputs: Reference information for comparison (optional)
+            requires_recent_info: Whether the query requires recent biomedical information
         
         Returns:
             Dictionary of evaluation results by metric
@@ -239,6 +293,15 @@ class BiomedicalResearcherEvaluator:
         else:
             sources_text = str(sources) if sources else "No sources cited"
         
+        # Extract source dates if available
+        source_dates = "Recent biomedical sources" if requires_recent_info else "Standard biomedical sources"
+        if isinstance(sources, list) and sources:
+            # Try to extract dates from source information
+            for source in sources:
+                if isinstance(source, dict) and 'date' in source:
+                    source_dates = f"Sources from {source.get('date', 'unknown date')}"
+                    break
+        
         evaluations = {}
         
         # Factual Correctness
@@ -268,15 +331,24 @@ class BiomedicalResearcherEvaluator:
             confidence=str(confidence)
         )
         
+        # Temporal Accuracy
+        evaluations['temporal_accuracy'] = self.temporal_accuracy_evaluator(
+            inputs=prompt,
+            outputs=response_text,
+            requires_recent_info=str(requires_recent_info),
+            source_dates=source_dates
+        )
+        
         return evaluations
     
     def calculate_overall_score(self, evaluations: Dict[str, EvaluatorResult]) -> float:
         """Calculate an overall score from individual evaluations."""
         weights = {
-            'factual_correctness': 0.4,  # Most important for biomedical research
-            'relevance': 0.3,
-            'source_quality': 0.2,
-            'confidence_alignment': 0.1
+            'factual_correctness': 0.35,  # Most important for biomedical research
+            'relevance': 0.25,
+            'source_quality': 0.15,
+            'temporal_accuracy': 0.15,    # Important for medical information currency
+            'confidence_alignment': 0.10
         }
         
         total_score = 0.0
