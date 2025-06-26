@@ -215,7 +215,7 @@ def extract_plots_from_output(agent_output: str) -> List[str]:
     return plot_matches
 
 
-def create_code_correctness_evaluator(model: str = "openai:o3-mini"):
+def create_code_correctness_evaluator(model: str = "openai:o4-mini"):
     """Create an evaluator for code correctness using custom LLM-as-judge."""
     def wrapped_evaluator(*, inputs: str, outputs: str, code: str = "", **kwargs) -> EvaluatorResult:
         # If code is not provided, extract it from outputs
@@ -234,7 +234,7 @@ def create_code_correctness_evaluator(model: str = "openai:o3-mini"):
     return wrapped_evaluator
 
 
-def create_code_execution_evaluator(model: str = "openai:o3-mini"):
+def create_code_execution_evaluator(model: str = "openai:o4-mini"):
     """Create an evaluator for successful code execution."""
     def wrapped_evaluator(*, inputs: str, outputs: str, code: str = "", **kwargs) -> EvaluatorResult:
         # If code is not provided, extract it from outputs
@@ -253,7 +253,7 @@ def create_code_execution_evaluator(model: str = "openai:o3-mini"):
     return wrapped_evaluator
 
 
-def create_data_analysis_quality_evaluator(model: str = "openai:o3-mini"):
+def create_data_analysis_quality_evaluator(model: str = "openai:o4-mini"):
     """Create an evaluator for data analysis quality."""
     def wrapped_evaluator(*, inputs: str, outputs: str, code: str = "", reference_outputs: str = "", **kwargs) -> EvaluatorResult:
         # If code is not provided, extract it from outputs
@@ -272,7 +272,7 @@ def create_data_analysis_quality_evaluator(model: str = "openai:o3-mini"):
     return wrapped_evaluator
 
 
-def create_visualization_quality_evaluator(model: str = "openai:o3-mini"):
+def create_visualization_quality_evaluator(model: str = "openai:o4-mini"):
     """Create an evaluator for visualization quality."""
     def wrapped_evaluator(*, inputs: str, outputs: str, code: str = "", **kwargs) -> EvaluatorResult:
         # If code is not provided, extract it from outputs
@@ -291,7 +291,7 @@ def create_visualization_quality_evaluator(model: str = "openai:o3-mini"):
     return wrapped_evaluator
 
 
-def create_code_style_evaluator(model: str = "openai:o3-mini"):
+def create_code_style_evaluator(model: str = "openai:o4-mini"):
     """Create an evaluator for code style and best practices."""
     def wrapped_evaluator(*, inputs: str, outputs: str, code: str = "", **kwargs) -> EvaluatorResult:
         # If code is not provided, extract it from outputs
@@ -310,7 +310,7 @@ def create_code_style_evaluator(model: str = "openai:o3-mini"):
     return wrapped_evaluator
 
 
-def create_task_completion_evaluator(model: str = "openai:o3-mini"):
+def create_task_completion_evaluator(model: str = "openai:o4-mini"):
     """Create an evaluator for task completion."""
     def wrapped_evaluator(*, inputs: str, outputs: str, code: str = "", reference_outputs: str = "", **kwargs) -> EvaluatorResult:
         # If code is not provided, extract it from outputs
@@ -332,7 +332,7 @@ def create_task_completion_evaluator(model: str = "openai:o3-mini"):
 class CoderAgentEvaluator:
     """Comprehensive evaluator for the Coder agent."""
     
-    def __init__(self, model: str = "openai:o3-mini"):
+    def __init__(self, model: str = "openai:o4-mini"):
         self.model = model
         
         # Initialize all evaluators
