@@ -138,12 +138,28 @@ def extract_schema_or_sql_node(state: DataTeamState) -> Dict[str, Any]:
 
     if isinstance(last_message, AIMessage) and last_message.content:
         content = last_message.content.strip()
+        natural_query = state.get("natural_language_query", "").lower()
         
-        is_likely_schema = "database schema:" in content.lower() or ("table:" in content.lower() and "columns:" in content.lower())
+        # Enhanced schema detection patterns
+        schema_indicators = [
+            "database schema:" in content.lower(),
+            "table:" in content.lower() and "columns:" in content.lower(),
+            "structure of" in content.lower() and ("table" in content.lower() or "database" in content.lower()),
+            content.lower().count("table:") >= 2,  # Multiple table descriptions
+            "description:" in content.lower() and "columns:" in content.lower(),
+            ("• " in content or "- " in content) and ("table" in content.lower() or "column" in content.lower()),  # Bullet point format
+        ]
+        is_likely_schema = any(schema_indicators)
+        
+        # Check if user is asking for schema-related information
+        user_wants_schema = any(phrase in natural_query for phrase in [
+            "schema", "structure", "describe", "what tables", "what columns", 
+            "database structure", "table structure", "dataset structure"
+        ])
+        
         sql_keywords = ["SELECT ", "INSERT ", "UPDATE ", "DELETE ", "CREATE ", "DROP ", "ALTER ", "WITH "]
-        is_sql = any(kw in content.upper() for kw in sql_keywords)
         
-        # Check for SQL in markdown blocks
+        # Check for SQL in markdown blocks first (most reliable SQL indicator)
         sql_match = re.search(r"```sql\s*(.*?)\s*```", content, re.DOTALL | re.IGNORECASE)
         extracted_sql_from_markdown = None
         if sql_match:
@@ -152,21 +168,35 @@ def extract_schema_or_sql_node(state: DataTeamState) -> Dict[str, Any]:
                 logger.info(f"👨‍💻 DATA TEAM: Extracted SQL (from markdown block): {extracted_sql_from_markdown}")
                 return {"generated_sql": extracted_sql_from_markdown, "provided_schema_text": None, "validation_feedback": None}
 
-        # Prioritize SQL detection over schema detection
-        if is_sql:
-            logger.info(f"👨‍💻 DATA TEAM: Extracted SQL (raw content): {content}")
-            return {"generated_sql": content, "provided_schema_text": None, "validation_feedback": None}
-        elif is_likely_schema:
+        # Check for actual SQL queries (not just mentions of SQL keywords in descriptions)
+        is_actual_sql = False
+        if any(kw in content.upper() for kw in sql_keywords):
+            # More sophisticated check: SQL keywords should be at the start of lines or after whitespace
+            # and not just mentioned in descriptive text
+            lines = content.split('\n')
+            for line in lines:
+                stripped_line = line.strip().upper()
+                if any(stripped_line.startswith(kw) for kw in sql_keywords):
+                    is_actual_sql = True
+                    break
+        
+        # Decision logic: Prioritize schema when user asks for schema OR when content clearly looks like schema
+        if user_wants_schema and is_likely_schema:
+            logger.info(f"👨‍💻 DATA TEAM: User requested schema and content matches schema pattern: {content[:150]}...")
+            return {"provided_schema_text": content, "generated_sql": None}
+        elif is_likely_schema and not is_actual_sql:
             logger.info(f"👨‍💻 DATA TEAM: Identified as schema description: {content[:150]}...")
             return {"provided_schema_text": content, "generated_sql": None}
+        elif is_actual_sql:
+            logger.info(f"👨‍💻 DATA TEAM: Extracted SQL (raw content): {content}")
+            return {"generated_sql": content, "provided_schema_text": None, "validation_feedback": None}
+        elif user_wants_schema:
+            # If user wanted schema but we couldn't clearly identify it, treat as schema
+            logger.warning(f"👨‍💻 DATA TEAM: User requested schema, treating response as schema: {content[:150]}...")
+            return {"provided_schema_text": content, "generated_sql": None}
         else:
-            natural_query = state.get("natural_language_query", "").lower()
-            if "schema" in natural_query or "database schema" in natural_query:
-                logger.warning(f"👨‍💻 DATA TEAM: Expected schema, treating as schema: {content[:150]}...")
-                return {"provided_schema_text": content, "generated_sql": None}
-            else:
-                logger.error(f"👨‍💻 DATA TEAM: Failed to extract valid SQL or schema: {content}")
-                return {"error_message": f"Agent did not produce a recognizable SQL query or schema. Response: {content}"}
+            logger.error(f"👨‍💻 DATA TEAM: Failed to extract valid SQL or schema: {content}")
+            return {"error_message": f"Agent did not produce a recognizable SQL query or schema. Response: {content}"}
     else:
         logger.error(f"👨‍💻 DATA TEAM: No valid AIMessage content found. Last message: {last_message}")
         return {"error_message": "ReAct agent did not return a final message with content."}
