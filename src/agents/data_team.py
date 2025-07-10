@@ -291,10 +291,26 @@ def sql_executor_node(state: DataTeamState) -> Dict[str, Any]:
             "diversity" in state.get("natural_language_query", "").lower(),
         ]
         
-        # Use file approach if query suggests large results or complex analysis
-        if any(large_dataset_indicators):
-            use_file_approach = True
-            logger.info("👨‍💻 DATA TEAM: Using file-based execution for potentially large/complex results")
+        # Check if this is for visualization/plotting - coder agent needs CSV files
+        user_query_lower = state.get("natural_language_query", "").lower()
+        visualization_indicators = [
+            "plot" in user_query_lower,
+            "graph" in user_query_lower,
+            "chart" in user_query_lower,
+            "visualiz" in user_query_lower,  # Catches visualize, visualization, etc.
+            "distribution" in user_query_lower and any(word in user_query_lower for word in ["plot", "chart", "graph", "show"]),
+            '"agent_name": "coder"' in user_query_lower,  # Check if coder is in the planned workflow
+            "coder" in user_query_lower and "visualization" in user_query_lower,  # Explicit coder + visualization
+        ]
+        
+        # Use file approach if query suggests large results, complex analysis, OR visualization
+        if any(large_dataset_indicators) or any(visualization_indicators):
+            if any(visualization_indicators):
+                use_file_approach = True
+                logger.info("👨‍💻 DATA TEAM: Using file-based execution for visualization/plotting (coder agent needs CSV files)")
+            else:
+                use_file_approach = True
+                logger.info("👨‍💻 DATA TEAM: Using file-based execution for potentially large/complex results")
         
         if use_file_approach:
             # Generate a meaningful description for the saved file
@@ -396,7 +412,30 @@ def format_final_response_node(state: DataTeamState, llm_client: Any) -> Dict[st
             final_message_content += "## Complete Query Results\n\n"
             # Check if results look like they might be from a file-based operation
             if "saved to" in execution_result.lower() or "file:" in execution_result.lower():
-                final_message_content += f"{execution_result}"
+                # For file-based results, show both the file info AND extract/show sample data
+                final_message_content += f"{execution_result}\n\n"
+                
+                # Try to extract data from the file result to show in conversation
+                # Look for data patterns in the execution result
+                if "|" in execution_result or "┃" in execution_result:
+                    # Table data is present in the result, extract it
+                    lines = execution_result.split('\n')
+                    data_section = []
+                    in_data_section = False
+                    for line in lines:
+                        # Look for table-like formatting
+                        if ("|" in line or "┃" in line) and not line.strip().startswith("File"):
+                            in_data_section = True
+                            data_section.append(line)
+                        elif in_data_section and line.strip() == "":
+                            break
+                    
+                    if data_section:
+                        final_message_content += "**📊 DATA FOR DOWNSTREAM PROCESSING:**\n```\n"
+                        final_message_content += "\n".join(data_section[:20])  # Show first 20 rows
+                        if len(data_section) > 20:
+                            final_message_content += f"\n... ({len(data_section)-20} more rows)\n"
+                        final_message_content += "\n```"
             else:
                 final_message_content += f"```\n{execution_result}\n```"
         else:
