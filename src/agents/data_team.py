@@ -324,7 +324,7 @@ def handle_error_node(state: DataTeamState) -> Dict[str, Any]:
     return {"error_message": error_msg}
 
 def format_final_response_node(state: DataTeamState, llm_client: Any) -> Dict[str, Any]:
-    """Formats the final response message using LLM-powered formatting for better presentation."""
+    """Formats the final response message using LLM-powered formatting for better presentation, including both analysis and raw results."""
     logger.info("👨‍💻 DATA TEAM: Formatting final response with LLM...")
     
     error_message = state.get("error_message")
@@ -357,6 +357,7 @@ def format_final_response_node(state: DataTeamState, llm_client: Any) -> Dict[st
     }
     
     # Generate the formatting prompt using the workflow template
+    llm_formatted_content = ""
     try:
         formatting_prompt = apply_workflow_prompt_template(
             "data_analyst", 
@@ -366,20 +367,47 @@ def format_final_response_node(state: DataTeamState, llm_client: Any) -> Dict[st
         
         # Use LLM to format the response
         formatted_response = llm_client.invoke([HumanMessage(content=formatting_prompt)])
-        final_message_content = formatted_response.content
+        llm_formatted_content = formatted_response.content
         logger.info("👨‍💻 DATA TEAM: Response formatted successfully using LLM")
         
     except Exception as e:
         # Fallback to simple formatting if LLM formatting fails
         logger.warning(f"👨‍💻 DATA TEAM: LLM formatting failed, using fallback: {e}")
         if provided_schema_text:
-            final_message_content = f"Here is the database schema you requested:\n\n{provided_schema_text}"
+            llm_formatted_content = f"## Analysis\n\nHere is the database schema you requested for analysis."
         elif error_message:
-            final_message_content = f"I encountered an error while processing '{query}': {error_message}"
+            llm_formatted_content = f"## Error Analysis\n\nI encountered an error while processing your request: {error_message}"
         elif execution_result:
-            final_message_content = f"Here are the results for '{query}':\n\n{execution_result}"
+            llm_formatted_content = f"## Analysis\n\nI've successfully executed your query and retrieved the results."
         else:
-            final_message_content = f"I processed '{query}' but couldn't validate or execute the SQL query. Validation feedback: {state.get('validation_feedback', 'No specific feedback available.')}"
+            llm_formatted_content = f"## Analysis\n\nI processed your request but couldn't validate or execute the SQL query. Validation feedback: {state.get('validation_feedback', 'No specific feedback available.')}"
+
+    # Combine LLM-formatted content with raw results
+    final_message_content = llm_formatted_content
+    
+    # Add raw results section for non-error cases
+    if not error_message and raw_results:
+        final_message_content += "\n\n---\n\n"
+        
+        if provided_schema_text:
+            final_message_content += "## Complete Database Schema\n\n"
+            final_message_content += f"```\n{provided_schema_text}\n```"
+        elif execution_result:
+            final_message_content += "## Complete Query Results\n\n"
+            # Check if results look like they might be from a file-based operation
+            if "saved to" in execution_result.lower() or "file:" in execution_result.lower():
+                final_message_content += f"{execution_result}"
+            else:
+                final_message_content += f"```\n{execution_result}\n```"
+        else:
+            final_message_content += "## Raw Results\n\n"
+            final_message_content += f"```\n{raw_results}\n```"
+    
+    # Add SQL query section if available
+    if generated_sql and not error_message:
+        final_message_content += "\n\n---\n\n"
+        final_message_content += "## SQL Query Used\n\n"
+        final_message_content += f"```sql\n{generated_sql}\n```"
 
     final_message = AIMessage(content=final_message_content, name="data_analyst")
     
