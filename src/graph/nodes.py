@@ -208,15 +208,37 @@ def planner_node(state: State) -> Command[Literal["supervisor", "__end__"]]:
 
     # Try to extract JSON from the response if it contains extra text
     json_start = cleaned_response.find('{')
-    json_end = cleaned_response.rfind('}')
     
-    if json_start != -1 and json_end != -1 and json_end > json_start:
-        # Extract just the JSON part
-        potential_json = cleaned_response[json_start:json_end + 1]
-        # If this looks more like pure JSON, use it instead
-        if len(potential_json) < len(cleaned_response) * 0.8:  # JSON is less than 80% of total
-            logger.debug(f"Extracted JSON from response: {potential_json}")
-            cleaned_response = potential_json
+    if json_start != -1:
+        # Try to find the end of the first complete JSON object
+        # by counting braces from the start
+        brace_count = 0
+        json_end = -1
+        
+        for i in range(json_start, len(cleaned_response)):
+            char = cleaned_response[i]
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i
+                    break
+        
+        if json_end != -1:
+            # Extract the first complete JSON object
+            potential_json = cleaned_response[json_start:json_end + 1]
+            
+            # Try parsing the extracted JSON
+            try:
+                json.loads(potential_json)
+                # If parsing succeeds, use the extracted JSON
+                logger.debug(f"Successfully extracted JSON from response: {potential_json}")
+                cleaned_response = potential_json
+            except json.JSONDecodeError:
+                # If extracted JSON is invalid, try the full response
+                logger.debug("Extracted JSON failed to parse, using full response")
+                pass
 
     goto = "supervisor"
     try:
@@ -248,8 +270,24 @@ def planner_node(state: State) -> Command[Literal["supervisor", "__end__"]]:
                         
     except json.JSONDecodeError as e:
         logger.warning(f"Planner response is not valid JSON: {str(e)}")
-        logger.debug(f"Invalid JSON response: {cleaned_response}")
-        goto = "__end__"
+        logger.warning(f"Error at position {e.pos}: {cleaned_response[max(0, e.pos-20):e.pos+20]}")
+        logger.debug(f"Full invalid JSON response: {cleaned_response}")
+        
+        # Try one more time with more aggressive cleaning
+        # Remove any trailing content after the last }
+        if '}' in cleaned_response:
+            last_brace = cleaned_response.rfind('}')
+            retry_json = cleaned_response[:last_brace + 1]
+            try:
+                json.loads(retry_json)
+                logger.info("Successfully recovered JSON by removing trailing content")
+                cleaned_response = retry_json
+                goto = "supervisor"  # Continue with recovered JSON
+            except json.JSONDecodeError:
+                logger.warning("JSON recovery attempt failed")
+                goto = "__end__"
+        else:
+            goto = "__end__"
     except Exception as e:
         logger.error(f"Unexpected error validating planner response: {str(e)}")
         goto = "__end__"
