@@ -91,18 +91,28 @@ def execute_sql_query_and_save(query: str, description: str = "") -> str:
         outputs_dir = "outputs"
         os.makedirs(outputs_dir, exist_ok=True)
         
-        # Generate a unique filename
+        # Generate a unique filename based on query content
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         query_id = str(uuid.uuid4())[:8]
         
-        # Clean description for filename
-        if description:
-            clean_desc = "".join(c for c in description if c.isalnum() or c in (' ', '_', '-')).rstrip()
-            clean_desc = clean_desc.replace(' ', '_')[:50]  # Max 50 chars
-            filename = f"query_results_{clean_desc}_{timestamp}_{query_id}.csv"
-        else:
-            filename = f"query_results_{timestamp}_{query_id}.csv"
+        # Try to infer content type from query for better naming
+        query_lower = query.lower()
+        content_type = "data"
         
+        if "antigen_species" in query_lower:
+            content_type = "antigen_species"
+        elif "antigen_epitope" in query_lower or "epitope" in query_lower:
+            content_type = "epitope"
+        elif "mhc_class" in query_lower:
+            content_type = "mhc_class"
+        elif "chains" in query_lower:
+            content_type = "chains"
+        elif description:
+            # Clean description for filename
+            clean_desc = "".join(c for c in description if c.isalnum() or c in (' ', '_', '-')).rstrip()
+            content_type = clean_desc.replace(' ', '_')[:30]  # Max 30 chars
+        
+        filename = f"query_results_{content_type}_{timestamp}_{query_id}.csv"
         file_path = os.path.join(outputs_dir, filename)
         
         # Save the DataFrame to CSV
