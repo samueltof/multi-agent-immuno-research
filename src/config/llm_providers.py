@@ -17,6 +17,7 @@ class ProviderType(str, Enum):
     BEDROCK = "bedrock"
     AZURE = "azure"
     PORTKEY_OPENAI = "portkey_openai"
+    PORTKEY_ANTHROPIC = "portkey_anthropic"
     PORTKEY_BEDROCK = "portkey_bedrock"
     PORTKEY_AZURE = "portkey_azure"
 
@@ -80,10 +81,22 @@ class PortkeyOpenAIConfig(PortkeyConfig):
     virtual_key: Optional[str] = Field(default_factory=lambda: os.getenv("PORTKEY_OPENAI_VIRTUAL_KEY"))
 
 
+class PortkeyAnthropicConfig(PortkeyConfig):
+    """Portkey with Anthropic backend configuration."""
+    provider: ProviderType = ProviderType.PORTKEY_ANTHROPIC
+    virtual_key: Optional[str] = Field(default_factory=lambda: os.getenv("PORTKEY_ANTHROPIC_VIRTUAL_KEY"))
+
+
 class PortkeyBedrockConfig(PortkeyConfig):
     """Portkey with Bedrock backend configuration."""
     provider: ProviderType = ProviderType.PORTKEY_BEDROCK
     virtual_key: Optional[str] = Field(default_factory=lambda: os.getenv("PORTKEY_BEDROCK_VIRTUAL_KEY"))
+
+
+class PortkeyAzureConfig(PortkeyConfig):
+    """Portkey with Azure backend configuration."""
+    provider: ProviderType = ProviderType.PORTKEY_AZURE
+    virtual_key: Optional[str] = Field(default_factory=lambda: os.getenv("PORTKEY_AZURE_VIRTUAL_KEY"))
 
 
 def create_provider_config(provider: str, model: str, **kwargs) -> LLMProviderConfig:
@@ -97,8 +110,9 @@ def create_provider_config(provider: str, model: str, **kwargs) -> LLMProviderCo
         ProviderType.BEDROCK: BedrockConfig,
         ProviderType.AZURE: AzureConfig,
         ProviderType.PORTKEY_OPENAI: PortkeyOpenAIConfig,
+        ProviderType.PORTKEY_ANTHROPIC: PortkeyAnthropicConfig,
         ProviderType.PORTKEY_BEDROCK: PortkeyBedrockConfig,
-        ProviderType.PORTKEY_AZURE: PortkeyConfig,
+        ProviderType.PORTKEY_AZURE: PortkeyAzureConfig,
     }
     
     config_class = config_classes.get(provider_type)
@@ -175,7 +189,7 @@ def create_llm_instance(config: LLMProviderConfig):
         kwargs.update(config.extra_kwargs)
         return AzureChatOpenAI(**kwargs)
     
-    elif config.provider in [ProviderType.PORTKEY_OPENAI, ProviderType.PORTKEY_BEDROCK, ProviderType.PORTKEY_AZURE]:
+    elif config.provider in [ProviderType.PORTKEY_OPENAI, ProviderType.PORTKEY_ANTHROPIC, ProviderType.PORTKEY_BEDROCK, ProviderType.PORTKEY_AZURE]:
         from portkey_ai import createHeaders
         
         portkey_headers = createHeaders(
@@ -208,6 +222,8 @@ PREDEFINED_CONFIGS = {
     "powerful": ["openai", "o3-mini"],
     "anthropic_reasoning": ["anthropic", "claude-3-5-sonnet-20241022"],
     "anthropic_basic": ["anthropic", "claude-3-haiku-20240307"],
+    "portkey_anthropic_reasoning": ["portkey_anthropic", "claude-3-5-sonnet-20241022"],
+    "portkey_anthropic_basic": ["portkey_anthropic", "claude-3-haiku-20240307"],
     "deepseek_reasoning": ["deepseek", "deepseek-reasoner"],
     "deepseek_basic": ["deepseek", "deepseek-chat"],
 } 
