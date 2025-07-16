@@ -231,9 +231,10 @@ When performing statistical tests and data analysis:
   - `📁 **FULL PATH**: /absolute/path/to/file.csv`
   - `🏷️ **FILE ID**: [id]` and `📝 **DESCRIPTION**: [description]`
 - **Loading Workflow for Files**:
-  1. Use `read_csv_file(file_path)` to understand the dataset structure and get a preview
-  2. Use `load_csv_as_dataframe(file_path)` to get the Python code needed to load the complete dataset
-  3. Execute the provided code to load the data into a pandas DataFrame for analysis
+  1. **FIRST**: Use `extract_file_paths_from_conversation()` to see all available CSV files
+  2. Use `read_csv_file(file_path)` to understand the dataset structure and get a preview
+  3. Use `load_csv_as_dataframe(file_path)` to get the Python code needed to load the complete dataset
+  4. Execute the provided code to load the data into a pandas DataFrame for analysis
 
 ## Method 2: Extract Data from Conversation History (Fallback)
 - **Look for Data Sections**: Search previous messages for:
@@ -253,14 +254,44 @@ When performing statistical tests and data analysis:
   ```
 
 ## Data Access Priority (Check in This Order):
-1. **First**: Look for CSV file paths in the most recent data analyst response
-2. **Second**: Look for `📊 DATA FOR DOWNSTREAM PROCESSING:` sections
-3. **Third**: Extract data from `## Complete Query Results` sections
-4. **Last**: If no data found, clearly state what data you need
+1. **First**: Use `extract_file_paths_from_conversation()` to find all available CSV files
+2. **Second**: Look for specific file paths in recent data analyst responses
+3. **Third**: Look for `📊 DATA FOR DOWNSTREAM PROCESSING:` sections
+4. **Fourth**: Extract data from `## Complete Query Results` sections
+5. **Last**: If no data found, clearly state what data you need
+
+## Working with Multiple Datasets:
+- **When you have multiple datasets** (e.g., antigen species and epitope data):
+  1. Use `extract_file_paths_from_conversation()` to see all files
+  2. Look at file names and timestamps to identify which is which
+  3. Files with "antigen_species" in the name contain species distribution data
+  4. Files with "epitope" in the name contain epitope distribution data
+  5. When in doubt, use `read_csv_file()` to preview each file's contents
+- **File Identification Tips**:
+  - Newer files have more recent timestamps
+  - File names often contain descriptive terms (species, epitope, etc.)
+  - Use file descriptions if available in the conversation
 
 ## Data Loading Examples:
 
-### For CSV Files:
+### For Multiple CSV Files:
+```python
+# Step 1: Find all available files
+file_info = extract_file_paths_from_conversation()
+print("Available files:", file_info)
+
+# Step 2: Load specific files based on content
+species_file = "outputs/query_results_antigen_species_20240716_125859_abc123.csv"
+epitope_file = "outputs/query_results_epitope_20240716_130002_def456.csv"
+
+species_df = pd.read_csv(species_file)
+epitope_df = pd.read_csv(epitope_file)
+
+print(f"Species data: {len(species_df)} rows")
+print(f"Epitope data: {len(epitope_df)} rows")
+```
+
+### For Single CSV File:
 ```python
 # When you find a file path like "saved to outputs/query_results_2024-07-10_12-39-10.csv"
 file_path = "outputs/query_results_2024-07-10_12-39-10.csv"
