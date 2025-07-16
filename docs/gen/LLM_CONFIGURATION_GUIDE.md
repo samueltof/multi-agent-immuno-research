@@ -32,6 +32,8 @@ Available predefined configurations:
 - `"powerful"`: `["openai", "o3-mini"]`
 - `"anthropic_reasoning"`: `["anthropic", "claude-3-5-sonnet-20241022"]`
 - `"anthropic_basic"`: `["anthropic", "claude-3-haiku-20240307"]`
+- `"portkey_anthropic_reasoning"`: `["portkey_anthropic", "claude-3-5-sonnet-20241022"]`
+- `"portkey_anthropic_basic"`: `["portkey_anthropic", "claude-3-haiku-20240307"]`
 - `"deepseek_reasoning"`: `["deepseek", "deepseek-reasoner"]`
 - `"deepseek_basic"`: `["deepseek", "deepseek-chat"]`
 
@@ -399,4 +401,8 @@ from src.agents.llm import clear_llm_cache
 
 # Clear cached LLM instances (useful during development)
 clear_llm_cache()
-``` 
+```
+
+## Additional Setup Guides
+
+- **[Portkey Anthropic Setup](../PORTKEY_ANTHROPIC_SETUP.md)**: Detailed guide for configuring Portkey as an AI gateway for Anthropic Claude models 
