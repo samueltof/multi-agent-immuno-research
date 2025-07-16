@@ -506,11 +506,14 @@ def check_for_errors_after_execution(state: DataTeamState) -> str:
 
 def create_data_team_graph(config=None):
     """Creates and compiles the LangGraph StateGraph for the data team."""
-    from ..config.agents import AGENT_LLM_MAP
-    from ..agents.llm import get_llm_by_type
+    from ..agents.llm import get_llm_by_agent
     
-    # Get the LLM client for the data team
-    llm_client = get_llm_by_type(AGENT_LLM_MAP["data_analyst"])
+    # Get the LLM client for the data team using the new flexible system
+    # If config is provided (for backward compatibility), use it; otherwise use agent-specific config
+    if config is not None:
+        llm_client = config
+    else:
+        llm_client = get_llm_by_agent("data_analyst")
     
     workflow = StateGraph(DataTeamState)
 

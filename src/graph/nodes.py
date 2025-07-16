@@ -6,8 +6,9 @@ from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 from langgraph.graph import END
 
-from src.agents import research_agent, coder_agent, browser_agent, data_analyst_agent, biomedical_researcher_agent
-from src.agents.llm import get_llm_by_type
+from src.agents import research_agent, coder_agent, browser_agent, data_analyst_agent
+from src.agents.biomedical_researcher import biomedical_researcher_node
+from src.agents.llm import get_llm_by_type, get_llm_by_agent
 from src.config import TEAM_MEMBERS
 from src.config.agents import AGENT_LLM_MAP
 from src.prompts.template import apply_prompt_template
@@ -106,40 +107,69 @@ def data_analyst_node(state: State) -> Command[Literal["supervisor"]]:
 def biomedical_researcher_graph_node(state: State) -> Command[Literal["supervisor"]]:
     """Node for the biomedical researcher agent that performs biomedical research using PydanticAI and MCP."""
     logger.info("Biomedical researcher agent starting task")
-    result = biomedical_researcher_agent(state)
-    logger.info("Biomedical researcher agent completed task")
     
-    # Handle the case where result['messages'][-1] is a dict with 'content' key
-    last_message = result['messages'][-1]
-    if isinstance(last_message, dict):
-        message_content = last_message.get('content', str(last_message))
-    else:
-        message_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
+    # Use the biomedical_researcher_node directly (it's an async function that we need to handle)
+    import asyncio
     
-    logger.debug(f"Biomedical researcher agent response: {message_content}")
-    
-    # Extract biomedical research result if available
-    biomedical_result = result.get('biomedical_research_result')
-    
-    update_data = {
-        "messages": [
-            HumanMessage(
-                content=RESPONSE_FORMAT.format(
-                    "biomedical_researcher", message_content
-                ),
-                name="biomedical_researcher",
-            )
-        ]
-    }
-    
-    # Add biomedical research result to state if available
-    if biomedical_result:
-        update_data["biomedical_research_result"] = biomedical_result
-    
-    return Command(
-        update=update_data,
-        goto="supervisor",
-    )
+    # Run the biomedical researcher node asynchronously
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        result = loop.run_until_complete(biomedical_researcher_node(state))
+        
+        # Convert the result to LangGraph compatible format
+        messages = result.get("messages", [])
+        biomedical_result = result.get("biomedical_research_result")
+        
+        if messages:
+            # Get the last message which should be the research summary
+            last_message = messages[-1]
+            if isinstance(last_message, dict):
+                message_content = last_message.get('content', str(last_message))
+            else:
+                message_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
+            
+            response = {
+                "messages": [
+                    HumanMessage(
+                        content=RESPONSE_FORMAT.format(
+                            "biomedical_researcher", message_content
+                        ),
+                        name="biomedical_researcher",
+                    )
+                ]
+            }
+            
+            # Include biomedical research result if available
+            if biomedical_result:
+                response["biomedical_research_result"] = biomedical_result
+                
+        else:
+            # Fallback if no messages in result
+            response = {
+                "messages": [
+                    HumanMessage(
+                        content=RESPONSE_FORMAT.format(
+                            "biomedical_researcher", "Biomedical research completed successfully."
+                        ),
+                        name="biomedical_researcher",
+                    )
+                ]
+            }
+            
+            # Include biomedical research result if available
+            if biomedical_result:
+                response["biomedical_research_result"] = biomedical_result
+                
+        logger.info("Biomedical researcher agent completed task")
+        logger.debug(f"Biomedical researcher agent response: {message_content if 'message_content' in locals() else 'No content'}")
+        
+        return Command(
+            update=response,
+            goto="supervisor",
+        )
+    finally:
+        loop.close()
 
 
 def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Literal["coder"], Literal["reporter"], Literal["data_analyst"], Literal["biomedical_researcher"], Literal["__end__"]]]:
@@ -149,7 +179,7 @@ def supervisor_node(state: State) -> Command[Union[Literal["researcher"], Litera
     
     messages = apply_prompt_template("supervisor", state)
     response = (
-        get_llm_by_type(AGENT_LLM_MAP["supervisor"])
+        get_llm_by_agent("supervisor")  # Use new agent-specific LLM system
         .with_structured_output(Router)
         .invoke(messages)
     )
@@ -177,10 +207,8 @@ def planner_node(state: State) -> Command[Literal["supervisor", "__end__"]]:
     """Planner node that generate the full plan."""
     logger.info("Planner generating full plan")
     messages = apply_prompt_template("planner", state)
-    # whether to enable deep thinking mode
-    llm = get_llm_by_type("basic")
-    if state.get("deep_thinking_mode"):
-        llm = get_llm_by_type("reasoning")
+    # Use the agent-specific LLM for planner
+    llm = get_llm_by_agent("planner")
     if state.get("search_before_planning"):
         searched_content = tavily_tool.invoke({"query": state["messages"][-1].content})
         messages = deepcopy(messages)
@@ -305,7 +333,7 @@ def coordinator_node(state: State) -> Command[Literal["planner", "__end__"]]:
     """Coordinator node that communicate with customers."""
     logger.info("Coordinator talking.")
     messages = apply_prompt_template("coordinator", state)
-    response = get_llm_by_type(AGENT_LLM_MAP["coordinator"]).invoke(messages)
+    response = get_llm_by_agent("coordinator").invoke(messages)  # Use new agent-specific LLM system
     logger.debug(f"Current state messages: {state['messages']}")
     logger.debug(f"reporter response: {response}")
 
@@ -322,7 +350,7 @@ def reporter_node(state: State) -> Command[Literal["supervisor"]]:
     """Reporter node that write a final report."""
     logger.info("Reporter write final report")
     messages = apply_prompt_template("reporter", state)
-    response = get_llm_by_type(AGENT_LLM_MAP["reporter"]).invoke(messages)
+    response = get_llm_by_agent("reporter").invoke(messages)  # Use new agent-specific LLM system
     logger.debug(f"Current state messages: {state['messages']}")
     logger.debug(f"reporter response: {response}")
 
