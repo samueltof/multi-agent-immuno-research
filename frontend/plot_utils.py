@@ -9,27 +9,40 @@ def extract_plot_paths_from_content(content: str) -> List[str]:
     """Extract plot file paths from agent response content"""
     plot_paths = []
     
-    # Look for explicit plot path patterns
+    # Look for explicit plot path patterns - ordered by specificity
     patterns = [
-        r'PLOT_SAVED: (.+\.png)',
-        r'Plot saved as [\'"](.+\.png)[\'"]',
+        r'PLOT_SAVED: (outputs/plots/[^\s]+\.png)',  # PLOT_SAVED format
+        r'Plot saved to: (outputs/plots/[^\s]+\.png)',  # "Plot saved to:" format
+        r'Plot successfully created and saved to:\s*(outputs/plots/[^\s]+\.png)',  # Success message
+        r'saved to:\s*(outputs/plots/[^\s]+\.png)',  # General "saved to" format
+        r'`(outputs/plots/[^`]+\.png)`',  # Plots in backticks (most reliable)
+        r'- [^:]+:\s*`(outputs/plots/[^`]+\.png)`',  # List format: "- Label: `path`"
+        r'^\s*- (outputs/plots/[^\s]+\.png)$',  # Simple list format: "- path"
+        r'filename = f[\'"]([^\'\"]*outputs/plots/[^\'\"]+\.png)[\'"]',  # Python variable
         r'!\[.*?\]\((outputs/plots/[^)]+\.png)\)',  # Markdown image format
-        r'!\[.*?\]\(([^)]+\.png)\)',  # General markdown image format
-        r'outputs/plots/(.+\.png)',
-        r'plots/(.+\.png)',  # Legacy support
-        r'- (.+\.png)',  # From the modified python_repl output
     ]
     
     for pattern in patterns:
-        matches = re.findall(pattern, content, re.IGNORECASE)
+        matches = re.findall(pattern, content, re.IGNORECASE | re.MULTILINE)
         for match in matches:
-            # Clean up the path
-            plot_path = match.strip()
+            # Handle tuple results from group captures
+            if isinstance(match, tuple):
+                plot_path = match[-1].strip()  # Take the last captured group
+            else:
+                plot_path = match.strip()
+            
+            # Skip empty matches or invalid paths
+            if not plot_path or not plot_path.endswith('.png'):
+                continue
+            
+            # Only consider paths that start with outputs/plots
+            if not plot_path.startswith('outputs/plots/'):
+                continue
             
             # Handle different working directory contexts
             possible_paths = [
-                plot_path,  # Original path
-                os.path.join('..', plot_path),  # Parent directory
+                plot_path,  # Original path (current dir)
+                os.path.join('..', plot_path),  # Parent directory (frontend -> root)
                 os.path.join('..', '..', plot_path),  # Grandparent directory
             ]
             
@@ -37,6 +50,11 @@ def extract_plot_paths_from_content(content: str) -> List[str]:
                 if os.path.exists(path) and path not in plot_paths:
                     plot_paths.append(path)
                     break
+    
+    # Debug logging - only for development/testing
+    if "plot" in content.lower() and "outputs/plots/" in content and not plot_paths:
+        # Log when we expect plots but don't find any
+        print(f"DEBUG: Expected plots but found none. Content sample: {content[:500]}...")
     
     return plot_paths
 
