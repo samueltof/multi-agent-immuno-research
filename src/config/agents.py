@@ -17,7 +17,7 @@ AGENT_LLM_MAP: dict[str, AgentLLMConfig] = {
     "planner": "reasoning",  # Uses predefined config  
     "supervisor": "basic",  # Uses predefined config
     "researcher": "basic",  # Uses predefined config
-    "coder": ["anthropic", "claude-3-5-sonnet-20241022"],  # Custom provider/model
+    "coder": "basic",  # Custom provider/model
     "browser": "vision",  # Uses predefined config
     "reporter": "basic",  # Uses predefined config
     "data_analyst": "reasoning",  # Uses predefined config
