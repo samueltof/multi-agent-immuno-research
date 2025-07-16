@@ -45,6 +45,7 @@ dependencies = [
     "langsmith>=0.3.45",
     "pytest>=8.3.5",
     "pytest-asyncio>=1.0.0",
+    "portkey-ai>=1.14.1",
 ]
 
 [project.optional-dependencies]
