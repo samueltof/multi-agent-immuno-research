@@ -21,7 +21,7 @@ AGENT_LLM_MAP: dict[str, AgentLLMConfig] = {
     "browser": ["portkey_openai", "gpt-4o"],
     "reporter": ["portkey_openai", "gpt-4o-mini"],
     "data_analyst": ["portkey_openai", "o3-mini"],
-    "biomedical_researcher": ["portkey_openai", "o3-mini"]
+    "biomedical_researcher": ["portkey_openai", "gpt-4o-mini"]
 }
 
 def resolve_agent_llm_config(agent_name: str) -> Tuple[str, str]:

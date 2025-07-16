@@ -50,6 +50,133 @@ class BiomedicalResearchOutput(BaseModel):
 
 def get_biomedical_model():
     """Get the appropriate PydanticAI model for the biomedical researcher agent."""
+    logger.info("Creating biomedical model - bypassing Portkey issues with simple approach")
+    
+    # TEMPORARY FIX: Bypass the complex modular system and use simple OpenAI model
+    # This avoids the Portkey interference issue that's causing NotGiven serialization errors
+    try:
+        # Use the simplest possible OpenAI model creation
+        from pydantic_ai.models.openai import OpenAIModel
+        
+        # Get API key from environment
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("No OPENAI_API_KEY found, model may fail")
+        
+        # Create the simplest possible OpenAI model (no custom providers)
+        model = OpenAIModel("gpt-4o-mini")
+        logger.info("Created simple OpenAI model successfully")
+        return model
+        
+    except Exception as e:
+        logger.warning(f"Failed to create simple OpenAI model: {e}")
+        # Fallback to the old system for backward compatibility
+        return _get_biomedical_model_legacy()
+
+
+def _create_pydantic_ai_model_from_config(config):
+    """Convert provider config to PydanticAI model."""
+    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.anthropic import AnthropicModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    from pydantic_ai.providers.anthropic import AnthropicProvider
+    from ..config.llm_providers import ProviderType
+    
+    provider_type = config.provider
+    
+    if provider_type == ProviderType.OPENAI:
+        # Direct OpenAI - use simple provider creation to avoid Portkey conflicts
+        logger.info("Creating direct OpenAI provider")
+        
+        # Use the simplest possible OpenAI provider creation
+        if config.api_key and config.base_url:
+            provider = OpenAIProvider(
+                api_key=config.api_key,
+                base_url=config.base_url
+            )
+        elif config.api_key:
+            provider = OpenAIProvider(api_key=config.api_key)
+        else:
+            # Use default provider with environment variables
+            provider = OpenAIProvider()
+        
+        return OpenAIModel(config.model, provider=provider)
+    
+    elif provider_type == ProviderType.ANTHROPIC:
+        # Direct Anthropic
+        provider = AnthropicProvider(api_key=config.api_key)
+        return AnthropicModel(config.model, provider=provider)
+    
+    elif provider_type in [ProviderType.PORTKEY_OPENAI, ProviderType.PORTKEY_ANTHROPIC, 
+                           ProviderType.PORTKEY_BEDROCK, ProviderType.PORTKEY_AZURE]:
+        # Portkey providers - all use OpenAI-compatible interface with custom headers
+        try:
+            from portkey_ai import createHeaders
+            from openai import AsyncOpenAI
+            
+            # Create Portkey headers for authentication
+            portkey_headers = createHeaders(
+                api_key=config.portkey_api_key,
+                virtual_key=config.virtual_key
+            )
+            
+            # Create custom AsyncOpenAI client with Portkey configuration
+            client_kwargs = {
+                "api_key": "portkey",  # Dummy key, auth handled by headers
+                "default_headers": portkey_headers,
+                "timeout": 30.0
+            }
+            if config.portkey_base_url:
+                client_kwargs["base_url"] = config.portkey_base_url
+                
+            openai_client = AsyncOpenAI(**client_kwargs)
+            
+            # Create OpenAI provider with the custom client
+            provider = OpenAIProvider(openai_client=openai_client)
+            
+            # PydanticAI OpenAIModel doesn't accept temperature during initialization
+            # Temperature is handled in the request
+            return OpenAIModel(config.model, provider=provider)
+            
+        except ImportError:
+            logger.error("portkey_ai package not installed. Install with: uv add portkey-ai")
+            raise RuntimeError("Portkey provider requires portkey-ai package")
+    
+    elif provider_type == ProviderType.DEEPSEEK:
+        # DeepSeek using OpenAI-compatible interface
+        from pydantic_ai.providers.deepseek import DeepSeekProvider
+        provider = DeepSeekProvider(api_key=config.api_key)
+        return OpenAIModel(config.model, provider=provider)
+    
+    elif provider_type == ProviderType.AZURE:
+        # Azure OpenAI
+        from pydantic_ai.providers.azure import AzureProvider
+        provider = AzureProvider(
+            api_key=config.api_key,
+            azure_endpoint=config.azure_endpoint,
+            api_version=config.api_version
+        )
+        return OpenAIModel(config.model, provider=provider)
+    
+    elif provider_type == ProviderType.BEDROCK:
+        # AWS Bedrock
+        try:
+            from pydantic_ai.models.bedrock import BedrockConverseModel
+            from pydantic_ai.providers.bedrock import BedrockProvider
+            
+            provider = BedrockProvider(region=config.region)
+            return BedrockConverseModel(config.model, provider=provider)
+            
+        except ImportError:
+            logger.error("AWS Bedrock dependencies not installed")
+            raise RuntimeError("Bedrock provider requires additional dependencies")
+    
+    else:
+        raise ValueError(f"Unsupported provider type for PydanticAI: {provider_type}")
+
+
+def _get_biomedical_model_legacy():
+    """Legacy biomedical model creation (fallback for backward compatibility)."""
     # Get configuration directly without creating LangChain LLM first
     agent_type = AGENT_LLM_MAP["biomedical_researcher"]
     
@@ -211,6 +338,37 @@ class BiomedicalResearcherWrapper:
         self.template_vars.update(template_vars)
         self.agent = None  # Force recreation with new vars
     
+    def research(self, query: str, deps: Optional[BiomedicalResearchDeps] = None) -> BiomedicalResearchOutput:
+        """Synchronous wrapper for biomedical research."""
+        import asyncio
+        
+        async def _run():
+            async with self:
+                return await self.run_research(query, deps)
+        
+        try:
+            # Try to get the current event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If there's already a running loop, we need to run in a new thread
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, _run())
+                    return future.result()
+            else:
+                # No running loop, safe to use asyncio.run
+                return asyncio.run(_run())
+        except Exception as e:
+            logger.error(f"Error in synchronous biomedical research: {e}")
+            # Return a structured error response
+            return BiomedicalResearchOutput(
+                summary=f"Error occurred during biomedical research: {str(e)}",
+                key_findings=[],
+                sources=[],
+                recommendations=["Please check the configuration and try again"],
+                confidence_level=0.0
+            )
+    
     async def run_research(self, query: str, deps: Optional[BiomedicalResearchDeps] = None) -> BiomedicalResearchOutput:
         """Run biomedical research with the given query and dependencies."""
         if deps is None:
@@ -220,7 +378,7 @@ class BiomedicalResearcherWrapper:
         
         try:
             result = await self.agent.run(query, deps=deps)
-            return result.data
+            return result.output
         except Exception as e:
             logger.error(f"Error in biomedical research: {e}")
             # Return a structured error response

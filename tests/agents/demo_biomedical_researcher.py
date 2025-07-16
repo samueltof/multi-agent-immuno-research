@@ -18,9 +18,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.agents.biomedical_researcher import (
     BiomedicalResearchDeps,
     BiomedicalResearchOutput,
-    biomedical_researcher_wrapper,
+    BiomedicalResearcherWrapper,
     biomedical_researcher_node,
-    biomedical_researcher_agent
+    create_biomedical_researcher_agent
 )
 
 # Configure logging
@@ -51,7 +51,7 @@ async def demo_standalone_research():
     
     try:
         # Use the biomedical researcher wrapper
-        async with biomedical_researcher_wrapper as researcher:
+        async with BiomedicalResearcherWrapper() as researcher:
             result = await researcher.run_research(query, deps)
             
             # Display results
@@ -94,7 +94,7 @@ async def demo_streaming_research():
     print("Streaming results...\n")
     
     try:
-        async with biomedical_researcher_wrapper as researcher:
+        async with BiomedicalResearcherWrapper() as researcher:
             print("📊 STREAMING RESEARCH OUTPUT:")
             print("-" * 40)
             
@@ -172,7 +172,7 @@ async def demo_multiple_queries():
         time_range="last year"
     )
     
-    async with biomedical_researcher_wrapper as researcher:
+    async with BiomedicalResearcherWrapper() as researcher:
         for i, query in enumerate(queries, 1):
             print(f"\n🔬 Research Query {i}: {query}")
             print("-" * 50)
@@ -232,7 +232,7 @@ async def interactive_demo():
         time_range="last year"
     )
     
-    async with biomedical_researcher_wrapper as researcher:
+    async with BiomedicalResearcherWrapper() as researcher:
         while True:
             try:
                 query = input("\n🔬 Enter your research query: ").strip()
