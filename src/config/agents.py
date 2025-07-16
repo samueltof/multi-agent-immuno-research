@@ -13,15 +13,15 @@ AgentLLMConfig = Union[str, List[str], Tuple[str, str], dict]
 
 # Define agent-LLM mapping with flexible configuration
 AGENT_LLM_MAP: dict[str, AgentLLMConfig] = {
-    "coordinator": "basic",  # Uses predefined config
-    "planner": "reasoning",  # Uses predefined config  
-    "supervisor": "basic",  # Uses predefined config
-    "researcher": "basic",  # Uses predefined config
-    "coder": "basic",  # Custom provider/model
-    "browser": "vision",  # Uses predefined config
-    "reporter": "basic",  # Uses predefined config
-    "data_analyst": "reasoning",  # Uses predefined config
-    "biomedical_researcher": "reasoning"  # Uses predefined config
+    "coordinator": ["portkey_openai", "gpt-4o-mini"],
+    "planner": ["portkey_openai", "o3-mini"],
+    "supervisor": ["portkey_openai", "gpt-4o-mini"],
+    "researcher": ["portkey_openai", "gpt-4o-mini"],
+    "coder": ["portkey_openai", "gpt-4o-mini"],
+    "browser": ["portkey_openai", "gpt-4o"],
+    "reporter": ["portkey_openai", "gpt-4o-mini"],
+    "data_analyst": ["portkey_openai", "o3-mini"],
+    "biomedical_researcher": ["portkey_openai", "o3-mini"]
 }
 
 def resolve_agent_llm_config(agent_name: str) -> Tuple[str, str]:
