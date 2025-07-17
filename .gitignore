@@ -14,7 +14,7 @@ agent_history.gif
 # Environment variables
 .env
 
-.cursor/
+# .cursor/
 
 .idea/
 
