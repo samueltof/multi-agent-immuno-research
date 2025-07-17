@@ -112,7 +112,7 @@ class LangGraphMCPTester:
             logger.error(f"❌ Failed to create direct OpenAI agent: {e}")
             return False
     
-        def create_portkey_agent(self):
+    def create_portkey_agent(self):
         """Create LangGraph agent with Portkey integration."""
         if not PORTKEY_AVAILABLE:
             logger.warning("❌ Portkey not available - skipping Portkey agent creation")
