@@ -13,15 +13,15 @@ AgentLLMConfig = Union[str, List[str], Tuple[str, str], dict]
 
 # Define agent-LLM mapping with flexible configuration
 AGENT_LLM_MAP: dict[str, AgentLLMConfig] = {
-    "coordinator": ["portkey_openai", "gpt-4o-mini"],
-    "planner": ["portkey_openai", "o3-mini"],
-    "supervisor": ["portkey_openai", "gpt-4o-mini"],
-    "researcher": ["portkey_openai", "gpt-4o-mini"],
-    "coder": ["portkey_openai", "gpt-4o-mini"],
-    "browser": ["portkey_openai", "gpt-4o"],
-    "reporter": ["portkey_openai", "gpt-4o-mini"],
-    "data_analyst": ["portkey_openai", "o3-mini"],
-    "biomedical_researcher": ["portkey_openai", "gpt-4o-mini"]
+    "coordinator": ["openai", "gpt-4o-mini"],
+    "planner": ["openai", "o3-mini"],
+    "supervisor": ["openai", "gpt-4o-mini"],
+    "researcher": ["openai", "gpt-4o-mini"],
+    "coder": ["openai", "gpt-4o-mini"],
+    "browser": ["openai", "gpt-4o"],
+    "reporter": ["openai", "gpt-4o-mini"],
+    "data_analyst": ["openai", "o3-mini"],
+    "biomedical_researcher": ["openai", "gpt-4o-mini"]  # Using Portkey for biomedical researcher
 }
 
 def resolve_agent_llm_config(agent_name: str) -> Tuple[str, str]:
@@ -74,6 +74,9 @@ def get_agent_full_config(agent_name: str) -> dict:
     Returns:
         Dictionary with full configuration including any extra parameters
     """
+    from .llm_providers import ProviderType
+    import os
+    
     if agent_name not in AGENT_LLM_MAP:
         raise ValueError(f"Agent '{agent_name}' not found in AGENT_LLM_MAP")
     
@@ -85,6 +88,56 @@ def get_agent_full_config(agent_name: str) -> dict:
         "model": model,
         "temperature": 0.0,  # Default temperature
     }
+    
+    # Add provider-specific configuration
+    if provider == ProviderType.OPENAI:
+        base_config.update({
+            "api_key": os.getenv("OPENAI_API_KEY"),
+            "base_url": os.getenv("OPENAI_BASE_URL"),
+        })
+    elif provider == ProviderType.ANTHROPIC:
+        base_config.update({
+            "api_key": os.getenv("ANTHROPIC_API_KEY"),
+        })
+    elif provider == ProviderType.PORTKEY_OPENAI:
+        base_config.update({
+            "portkey_api_key": os.getenv("PORTKEY_API_KEY"),
+            "virtual_key": os.getenv("PORTKEY_OPENAI_VIRTUAL_KEY", "@openai"),
+            "portkey_base_url": os.getenv("PORTKEY_BASE_URL", "https://api.portkey.ai/v1"),
+        })
+    elif provider == ProviderType.PORTKEY_ANTHROPIC:
+        base_config.update({
+            "portkey_api_key": os.getenv("PORTKEY_API_KEY"),
+            "virtual_key": os.getenv("PORTKEY_ANTHROPIC_VIRTUAL_KEY", "@anthropic"),
+            "portkey_base_url": os.getenv("PORTKEY_BASE_URL", "https://api.portkey.ai/v1"),
+        })
+    elif provider == ProviderType.PORTKEY_BEDROCK:
+        base_config.update({
+            "portkey_api_key": os.getenv("PORTKEY_API_KEY"),
+            "virtual_key": os.getenv("PORTKEY_BEDROCK_VIRTUAL_KEY", "@bedrock"),
+            "portkey_base_url": os.getenv("PORTKEY_BASE_URL", "https://api.portkey.ai/v1"),
+        })
+    elif provider == ProviderType.PORTKEY_AZURE:
+        base_config.update({
+            "portkey_api_key": os.getenv("PORTKEY_API_KEY"),
+            "virtual_key": os.getenv("PORTKEY_AZURE_VIRTUAL_KEY", "@azure"),
+            "portkey_base_url": os.getenv("PORTKEY_BASE_URL", "https://api.portkey.ai/v1"),
+        })
+    elif provider == ProviderType.DEEPSEEK:
+        base_config.update({
+            "api_key": os.getenv("DEEPSEEK_API_KEY"),
+            "base_url": os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        })
+    elif provider == ProviderType.AZURE:
+        base_config.update({
+            "api_key": os.getenv("AZURE_OPENAI_API_KEY"),
+            "azure_endpoint": os.getenv("AZURE_OPENAI_ENDPOINT"),
+            "api_version": os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+        })
+    elif provider == ProviderType.BEDROCK:
+        base_config.update({
+            "region": os.getenv("AWS_REGION", "us-east-1"),
+        })
     
     # If config is a dict, merge additional parameters
     if isinstance(config, dict):

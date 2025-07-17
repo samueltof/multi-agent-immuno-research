@@ -17,6 +17,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.mcp import MCPServerStdio
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from ..config.agents import AGENT_LLM_MAP
 from ..config import (
@@ -49,123 +50,174 @@ class BiomedicalResearchOutput(BaseModel):
 
 
 def get_biomedical_model():
-    """Get the appropriate PydanticAI model for the biomedical researcher agent."""
-    logger.info("Creating biomedical model - bypassing Portkey issues with simple approach")
-    
-    # TEMPORARY FIX: Bypass the complex modular system and use simple OpenAI model
-    # This avoids the Portkey interference issue that's causing NotGiven serialization errors
+    """Get the appropriate PydanticAI model with proper Portkey integration."""
     try:
-        # Use the simplest possible OpenAI model creation
-        from pydantic_ai.models.openai import OpenAIModel
+        from ..config.agents import get_agent_full_config
+        config_dict = get_agent_full_config("biomedical_researcher")
         
-        # Get API key from environment
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            logger.warning("No OPENAI_API_KEY found, model may fail")
-        
-        # Create the simplest possible OpenAI model (no custom providers)
-        model = OpenAIModel("gpt-4o-mini")
-        logger.info("Created simple OpenAI model successfully")
+        # Use the new modular system to create the model
+        model = _create_pydantic_ai_model_from_config(config_dict)
+        logger.info(f"Created biomedical model successfully: {config_dict['model']} via {config_dict['provider']}")
         return model
         
     except Exception as e:
-        logger.warning(f"Failed to create simple OpenAI model: {e}")
-        # Fallback to the old system for backward compatibility
+        logger.error(f"Failed to create biomedical model from config: {e}")
+        # Fallback to legacy system
+        logger.info("Falling back to legacy model creation")
         return _get_biomedical_model_legacy()
 
 
 def _create_pydantic_ai_model_from_config(config):
-    """Convert provider config to PydanticAI model."""
+    """Convert provider config to PydanticAI model with proper Portkey support."""
     from pydantic_ai.models.openai import OpenAIModel
     from pydantic_ai.models.anthropic import AnthropicModel
     from pydantic_ai.providers.openai import OpenAIProvider
     from pydantic_ai.providers.anthropic import AnthropicProvider
     from ..config.llm_providers import ProviderType
     
-    provider_type = config.provider
+    # Handle both dictionary and object configurations
+    if isinstance(config, dict):
+        provider_type = config.get('provider')
+        model_name = config.get('model')
+        api_key = config.get('api_key')
+        base_url = config.get('base_url')
+        portkey_api_key = config.get('portkey_api_key') or os.getenv('PORTKEY_API_KEY')
+        
+        # Handle virtual key lookup more carefully
+        virtual_key = config.get('virtual_key')
+        if not virtual_key and provider_type:
+            # Convert provider_type to string if it's an enum
+            provider_str = str(provider_type).upper() if hasattr(provider_type, 'upper') else provider_type.value.upper()
+            env_var_name = f'PORTKEY_{provider_str.replace("PORTKEY_", "")}_VIRTUAL_KEY'
+            virtual_key = os.getenv(env_var_name)
+            
+        azure_endpoint = config.get('azure_endpoint')
+        region = config.get('region', 'us-east-1')
+    else:
+        # Object-style access for backwards compatibility
+        provider_type = config.provider
+        model_name = config.model
+        api_key = getattr(config, 'api_key', None)
+        base_url = getattr(config, 'base_url', None)
+        portkey_api_key = getattr(config, 'portkey_api_key', None)
+        virtual_key = getattr(config, 'virtual_key', None)
+        azure_endpoint = getattr(config, 'azure_endpoint', None)
+        region = getattr(config, 'region', 'us-east-1')
     
     if provider_type == ProviderType.OPENAI:
-        # Direct OpenAI - use simple provider creation to avoid Portkey conflicts
+        # Direct OpenAI provider
         logger.info("Creating direct OpenAI provider")
         
-        # Use the simplest possible OpenAI provider creation
-        if config.api_key and config.base_url:
-            provider = OpenAIProvider(
-                api_key=config.api_key,
-                base_url=config.base_url
-            )
-        elif config.api_key:
-            provider = OpenAIProvider(api_key=config.api_key)
-        else:
-            # Use default provider with environment variables
-            provider = OpenAIProvider()
-        
-        return OpenAIModel(config.model, provider=provider)
+        provider_kwargs = {}
+        if api_key:
+            provider_kwargs['api_key'] = api_key
+        if base_url:
+            provider_kwargs['base_url'] = base_url
+            
+        provider = OpenAIProvider(**provider_kwargs)
+        return OpenAIModel(model_name, provider=provider)
     
     elif provider_type == ProviderType.ANTHROPIC:
         # Direct Anthropic
-        provider = AnthropicProvider(api_key=config.api_key)
-        return AnthropicModel(config.model, provider=provider)
+        provider_kwargs = {}
+        if api_key:
+            provider_kwargs['api_key'] = api_key
+            
+        provider = AnthropicProvider(**provider_kwargs)
+        return AnthropicModel(model_name, provider=provider)
     
     elif provider_type in [ProviderType.PORTKEY_OPENAI, ProviderType.PORTKEY_ANTHROPIC, 
                            ProviderType.PORTKEY_BEDROCK, ProviderType.PORTKEY_AZURE]:
-        # Portkey providers - all use OpenAI-compatible interface with custom headers
+        # FIXED: Use Portkey client directly as OpenAI client 
         try:
-            from portkey_ai import createHeaders
-            from openai import AsyncOpenAI
+            from portkey_ai import Portkey
             
-            # Create Portkey headers for authentication
-            portkey_headers = createHeaders(
-                api_key=config.portkey_api_key,
-                virtual_key=config.virtual_key
+            logger.info(f"Creating Portkey client provider for {provider_type}")
+            
+            # Create Portkey configuration
+            portkey_config = {
+                "api_key": api_key or os.getenv("OPENAI_API_KEY"),  # Fallback to OpenAI key
+            }
+            
+            # Determine the provider for Portkey config
+            if provider_type == ProviderType.PORTKEY_OPENAI:
+                portkey_config["provider"] = "openai"
+            elif provider_type == ProviderType.PORTKEY_ANTHROPIC:
+                portkey_config["provider"] = "anthropic"  
+            elif provider_type == ProviderType.PORTKEY_BEDROCK:
+                portkey_config["provider"] = "bedrock"
+            elif provider_type == ProviderType.PORTKEY_AZURE:
+                portkey_config["provider"] = "azure"
+            
+            # Add virtual key if available
+            if virtual_key:
+                portkey_config["virtual_key"] = virtual_key
+                logger.info(f"Using Portkey virtual key: {virtual_key}")
+            
+            # Add model override
+            portkey_config["override_params"] = {
+                "model": model_name
+            }
+            
+            # Add metadata for observability
+            metadata = {
+                "env": os.getenv("ENVIRONMENT", "development"),
+                "_agent": "biomedical_researcher",
+                "_model": model_name
+            }
+            
+            # Create Portkey client
+            portkey_client = Portkey(
+                api_key=portkey_api_key,
+                config=portkey_config,
+                metadata=metadata
             )
             
-            # Create custom AsyncOpenAI client with Portkey configuration
-            client_kwargs = {
-                "api_key": "portkey",  # Dummy key, auth handled by headers
-                "default_headers": portkey_headers,
-                "timeout": 30.0
-            }
-            if config.portkey_base_url:
-                client_kwargs["base_url"] = config.portkey_base_url
-                
-            openai_client = AsyncOpenAI(**client_kwargs)
+            # Use Portkey client as the OpenAI client
+            provider = OpenAIProvider(openai_client=portkey_client)
             
-            # Create OpenAI provider with the custom client
-            provider = OpenAIProvider(openai_client=openai_client)
+            logger.info(f"Successfully created Portkey client provider")
+            return OpenAIModel(model_name, provider=provider)
             
-            # PydanticAI OpenAIModel doesn't accept temperature during initialization
-            # Temperature is handled in the request
-            return OpenAIModel(config.model, provider=provider)
-            
-        except ImportError:
-            logger.error("portkey_ai package not installed. Install with: uv add portkey-ai")
-            raise RuntimeError("Portkey provider requires portkey-ai package")
+        except ImportError as e:
+            logger.error(f"Portkey import failed: {e}. Falling back to direct OpenAI")
+            # Fallback to direct OpenAI if Portkey is not available
+            provider = OpenAIProvider(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url="https://api.openai.com/v1"
+            )
+            return OpenAIModel(model_name, provider=provider)
+        except Exception as e:
+            logger.error(f"Portkey client setup failed: {e}. Falling back to direct OpenAI")
+            # Fallback to direct OpenAI if Portkey setup fails
+            provider = OpenAIProvider(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url="https://api.openai.com/v1"
+            )
+            return OpenAIModel(model_name, provider=provider)
     
     elif provider_type == ProviderType.DEEPSEEK:
         # DeepSeek using OpenAI-compatible interface
-        from pydantic_ai.providers.deepseek import DeepSeekProvider
-        provider = DeepSeekProvider(api_key=config.api_key)
-        return OpenAIModel(config.model, provider=provider)
+        provider = OpenAIProvider(
+            api_key=api_key,
+            base_url=base_url or "https://api.deepseek.com"
+        )
+        return OpenAIModel(model_name, provider=provider)
     
     elif provider_type == ProviderType.AZURE:
         # Azure OpenAI
-        from pydantic_ai.providers.azure import AzureProvider
-        provider = AzureProvider(
-            api_key=config.api_key,
-            azure_endpoint=config.azure_endpoint,
-            api_version=config.api_version
+        provider = OpenAIProvider(
+            api_key=api_key,
+            base_url=f"{azure_endpoint}/openai/deployments/{model_name}",
         )
-        return OpenAIModel(config.model, provider=provider)
+        return OpenAIModel(model_name, provider=provider)
     
     elif provider_type == ProviderType.BEDROCK:
         # AWS Bedrock
         try:
-            from pydantic_ai.models.bedrock import BedrockConverseModel
-            from pydantic_ai.providers.bedrock import BedrockProvider
+            from pydantic_ai.models.bedrock import BedrockModel
             
-            provider = BedrockProvider(region=config.region)
-            return BedrockConverseModel(config.model, provider=provider)
+            return BedrockModel(model_name, region=region)
             
         except ImportError:
             logger.error("AWS Bedrock dependencies not installed")
@@ -293,8 +345,25 @@ def create_biomedical_researcher_agent(template_vars: Optional[Dict[str, Any]] =
     # Get the processed prompt from the centralized system
     system_prompt = get_processed_prompt("biomedical_researcher", template_vars)
     
+    # TEMPORARY FIX: Use direct OpenAI for MCP compatibility
+    # The Portkey integration works, but MCP servers have serialization issues with Portkey clients
+    # TODO: Remove this fallback once PydanticAI fixes NotGiven serialization in MCP context
+    logger.info("Using direct OpenAI model for MCP compatibility (avoiding NotGiven serialization)")
+    
+    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    
+    # Use direct OpenAI to avoid MCP serialization issues
+    direct_model = OpenAIModel(
+        "gpt-4o-mini",
+        provider=OpenAIProvider(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            base_url="https://api.openai.com/v1"
+        )
+    )
+    
     return Agent(
-        get_biomedical_model(),
+        direct_model,  # Use direct model instead of get_biomedical_model()
         deps_type=BiomedicalResearchDeps,
         output_type=BiomedicalResearchOutput,
         mcp_servers=create_biomedical_mcp_servers(),

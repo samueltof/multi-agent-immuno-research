@@ -103,6 +103,23 @@ def create_provider_config(provider: str, model: str, **kwargs) -> LLMProviderCo
     """Factory function to create provider-specific configurations."""
     provider_type = ProviderType(provider)
     
+    # Models that don't support temperature parameter
+    NO_TEMPERATURE_MODELS = {
+        "o1", "o1-mini", "o1-preview", 
+        "o3", "o3-mini", "o3-preview",
+        "o4", "o4-mini", "o4-preview"
+    }
+    
+    # Check if this model doesn't support temperature
+    model_base = model.lower().replace("-", "")
+    supports_temperature = not any(no_temp_model.replace("-", "") in model_base 
+                                   for no_temp_model in NO_TEMPERATURE_MODELS)
+    
+    # Remove temperature for models that don't support it
+    if not supports_temperature and "temperature" in kwargs:
+        kwargs.pop("temperature")
+        print(f"⚠️  Removed temperature parameter for {model} (reasoning model)")
+    
     config_classes = {
         ProviderType.OPENAI: OpenAIConfig,
         ProviderType.ANTHROPIC: AnthropicConfig,
@@ -126,8 +143,21 @@ def create_llm_instance(config: LLMProviderConfig):
     """Factory function to create LLM instances from configuration."""
     from langchain_openai import ChatOpenAI
     
+    # Helper function to check if model supports temperature
+    def supports_temperature(model_name: str) -> bool:
+        NO_TEMPERATURE_MODELS = {
+            "o1", "o1-mini", "o1-preview", 
+            "o3", "o3-mini", "o3-preview",
+            "o4", "o4-mini", "o4-preview"
+        }
+        model_base = model_name.lower().replace("-", "")
+        return not any(no_temp_model.replace("-", "") in model_base 
+                      for no_temp_model in NO_TEMPERATURE_MODELS)
+    
     if config.provider == ProviderType.OPENAI:
-        kwargs = {"model": config.model, "temperature": config.temperature}
+        kwargs = {"model": config.model}
+        if supports_temperature(config.model):
+            kwargs["temperature"] = config.temperature
         if config.base_url:
             kwargs["base_url"] = config.base_url
         if config.api_key:
@@ -139,7 +169,9 @@ def create_llm_instance(config: LLMProviderConfig):
     
     elif config.provider == ProviderType.ANTHROPIC:
         from langchain_anthropic import ChatAnthropic
-        kwargs = {"model": config.model, "temperature": config.temperature}
+        kwargs = {"model": config.model}
+        if supports_temperature(config.model):
+            kwargs["temperature"] = config.temperature
         if config.api_key:
             kwargs["api_key"] = config.api_key
         if config.max_tokens:
@@ -149,7 +181,9 @@ def create_llm_instance(config: LLMProviderConfig):
     
     elif config.provider == ProviderType.DEEPSEEK:
         from langchain_deepseek import ChatDeepSeek
-        kwargs = {"model": config.model, "temperature": config.temperature}
+        kwargs = {"model": config.model}
+        if supports_temperature(config.model):
+            kwargs["temperature"] = config.temperature
         if config.base_url:
             kwargs["api_base"] = config.base_url
         if config.api_key:
@@ -163,8 +197,10 @@ def create_llm_instance(config: LLMProviderConfig):
         from langchain_aws import ChatBedrock
         kwargs = {
             "model_id": config.model,
-            "model_kwargs": {"temperature": config.temperature}
+            "model_kwargs": {}
         }
+        if supports_temperature(config.model):
+            kwargs["model_kwargs"]["temperature"] = config.temperature
         if hasattr(config, 'region'):
             kwargs["region"] = config.region
         if config.max_tokens:
@@ -175,9 +211,10 @@ def create_llm_instance(config: LLMProviderConfig):
     elif config.provider == ProviderType.AZURE:
         from langchain_openai import AzureChatOpenAI
         kwargs = {
-            "deployment_name": config.model,
-            "temperature": config.temperature
+            "deployment_name": config.model
         }
+        if supports_temperature(config.model):
+            kwargs["temperature"] = config.temperature
         if config.api_key:
             kwargs["api_key"] = config.api_key
         if hasattr(config, 'azure_endpoint'):
@@ -199,11 +236,12 @@ def create_llm_instance(config: LLMProviderConfig):
         
         kwargs = {
             "model": config.model,
-            "temperature": config.temperature,
             "base_url": config.portkey_base_url,
             "default_headers": portkey_headers,
             "api_key": "portkey"  # Dummy key as auth is handled via headers
         }
+        if supports_temperature(config.model):
+            kwargs["temperature"] = config.temperature
         if config.max_tokens:
             kwargs["max_tokens"] = config.max_tokens
         kwargs.update(config.extra_kwargs)
